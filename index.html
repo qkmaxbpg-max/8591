@@ -2,12 +2,15 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="代儲管理">
 <meta name="theme-color" content="#0f1117">
 <title>代儲管理</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,6 +50,7 @@
     </div>
     <div class="top-right">
       <span id="userLabel" class="user-label"></span>
+      <button class="icon-btn" onclick="doRefresh()" title="重新整理">⟳</button>
       <button class="icon-btn" onclick="toggleTheme()" title="切換主題">◐</button>
       <button class="icon-btn" onclick="doLogout()" title="登出">⏻</button>
     </div>
@@ -68,8 +72,12 @@
     <div class="card">
       <div class="card-head">
         <h3>各平台利潤</h3>
-        <input id="dashMonth" type="month" onchange="renderDashboard()">
-        <button class="btn sm ghost" onclick="setDashAll()" id="dashAllBtn">全部</button>
+        <div class="month-picker">
+          <button class="mp-arrow" onclick="shiftMonth(-1)">‹</button>
+          <span id="dashMonthLabel" class="mp-label"></span>
+          <button class="mp-arrow" onclick="shiftMonth(1)">»</button>
+          <button class="btn sm ghost mp-all" onclick="setDashAll()" id="dashAllBtn">全部</button>
+        </div>
       </div>
       <div id="platformChart" class="chart-area"></div>
     </div>
@@ -280,7 +288,7 @@
       <div class="form-group"><label>日期</label><input id="ad_date" type="date"></div>
       <div class="form-group"><label>金額 (NT$)</label><input id="ad_amount" type="number" min="0" placeholder="0"></div>
     </div>
-    <div class="form-group"><label>廣告平台</label><input id="ad_platform" list="adPlatformList" placeholder="Dcard / FB / 蝦皮"><datalist id="adPlatformList"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google Ads"></datalist></div>
+    <div class="form-group"><label>廣告平台</label><input id="ad_platform" list="adPlatformList" placeholder="8591 / Dcard / FB"><datalist id="adPlatformList"><option value="8591"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google Ads"></datalist></div>
     <div class="form-group"><label>備註</label><input id="ad_notes" placeholder=""></div>
   </div>
   <div class="modal-foot">

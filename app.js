@@ -178,19 +178,39 @@ function monthAds(ym) {
 
 /* ──── Dashboard ──── */
 var dashShowAll = false;
+var dashYear, dashMon;
+function initDashMonth() {
+  var d = new Date();
+  dashYear = d.getFullYear();
+  dashMon = d.getMonth(); // 0-based
+  updateMonthLabel();
+}
+function updateMonthLabel() {
+  $('dashMonthLabel').textContent = dashYear + '/' + (dashMon + 1 < 10 ? '0' : '') + (dashMon + 1);
+}
+function shiftMonth(dir) {
+  dashShowAll = false;
+  $('dashAllBtn').classList.remove('primary');
+  $('dashAllBtn').classList.add('ghost');
+  dashMon += dir;
+  if (dashMon < 0) { dashMon = 11; dashYear-- }
+  if (dashMon > 11) { dashMon = 0; dashYear++ }
+  updateMonthLabel();
+  renderDashboard();
+}
 function setDashAll() {
   dashShowAll = !dashShowAll;
   $('dashAllBtn').classList.toggle('primary', dashShowAll);
   $('dashAllBtn').classList.toggle('ghost', !dashShowAll);
-  $('dashMonth').disabled = dashShowAll;
   renderDashboard();
 }
-function initDashMonth() {
-  $('dashMonth').value = today().slice(0, 7);
+function getDashYM() {
+  return dashYear + '-' + (dashMon + 1 < 10 ? '0' : '') + (dashMon + 1);
 }
 function renderDashboard() {
-  if (!$('dashMonth').value) initDashMonth();
-  var ym = $('dashMonth').value;
+  if (!dashYear) initDashMonth();
+  updateMonthLabel();
+  var ym = getDashYM();
   var filtered = orders.filter(function(o) {
     if (dashShowAll) return true;
     return (o.order_date || '').slice(0, 7) === ym;
@@ -869,7 +889,7 @@ function openAdModal(item) {
   $('ad_id').value = item ? item.id : '';
   $('ad_date').value = item ? item.ad_date : today();
   $('ad_amount').value = item ? item.amount : '';
-  $('ad_platform').value = item ? (item.ad_platform || '') : '';
+  $('ad_platform').value = item ? (item.ad_platform || '') : '8591';
   $('ad_notes').value = item ? (item.notes || '') : '';
   openModal('adModal');
 }
@@ -918,6 +938,13 @@ function deleteAd(id) {
       });
     }
   });
+}
+
+/* ──── Refresh ──── */
+function doRefresh() {
+  if (isDemo) { loadAll(); toast('已重新整理', 'ok'); return }
+  loadAll();
+  toast('已重新整理', 'ok');
 }
 
 /* ──── Utils ──── */

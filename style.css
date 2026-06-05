@@ -155,6 +155,18 @@ tr:hover td{background:var(--bg2)}
 .empty .icon{font-size:2.5rem;margin-bottom:8px}
 .empty p{font-size:.9rem}
 
+/* Month picker */
+.month-picker{display:flex;align-items:center;gap:4px}
+.mp-arrow{background:none;border:1px solid var(--bg4);color:var(--fg1);width:30px;height:30px;border-radius:var(--radius-sm);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+.mp-arrow:hover{background:var(--bg3);color:var(--fg0)}
+.mp-label{font-size:.85rem;font-weight:600;min-width:90px;text-align:center;color:var(--fg0)}
+.mp-all{margin-left:4px}
+
+/* Safe area (iPhone notch) */
+#topBar{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+#tabBar{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.tab-content{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+
 /* Product groups */
 .prod-group{margin-bottom:12px;padding:0;overflow:hidden}
 .prod-group-head{display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;user-select:none;transition:var(--transition)}
