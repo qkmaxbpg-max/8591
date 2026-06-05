@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1117">
+<title>代儲管理</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Login -->
+<div id="loginPage" class="page">
+  <div class="login-box">
+    <h1>📦 代儲管理系統</h1>
+    <p class="sub">管理你的代儲商品、訂單與利潤</p>
+    <div class="form-group">
+      <label>Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label>密碼</label>
+      <input id="loginPw" type="password" placeholder="密碼">
+    </div>
+    <button id="btnLogin" class="btn primary full" onclick="doLogin()">登入</button>
+    <button class="btn ghost full" onclick="doSignup()" style="margin-top:8px">註冊新帳號</button>
+    <div class="form-group" style="margin-top:16px">
+      <button class="btn ghost full" onclick="enterDemo()">先試用（本機模式）</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app" class="page" style="display:none">
+
+  <!-- Top Bar -->
+  <header id="topBar">
+    <div class="top-left">
+      <span class="logo">📦</span>
+      <span class="app-title">代儲管理</span>
+    </div>
+    <div class="top-right">
+      <span id="userLabel" class="user-label"></span>
+      <button class="icon-btn" onclick="toggleTheme()" title="切換主題">◐</button>
+      <button class="icon-btn" onclick="doLogout()" title="登出">⏻</button>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav id="tabBar">
+    <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">總覽</button>
+    <button class="tab" data-tab="orders" onclick="switchTab('orders')">訂單</button>
+    <button class="tab" data-tab="products" onclick="switchTab('products')">商品</button>
+    <button class="tab" data-tab="agents" onclick="switchTab('agents')">出單人</button>
+    <button class="tab" data-tab="customers" onclick="switchTab('customers')">客戶</button>
+  </nav>
+
+  <!-- Dashboard -->
+  <section id="tab-dashboard" class="tab-content active">
+    <div class="stat-cards" id="statCards"></div>
+    <div class="card">
+      <div class="card-head">
+        <h3>各平台利潤</h3>
+        <select id="dashPeriod" onchange="renderDashboard()">
+          <option value="month">本月</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+      <div id="platformChart" class="chart-area"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>近期訂單</h3></div>
+      <div id="recentOrders" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <!-- Orders -->
+  <section id="tab-orders" class="tab-content">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
+      <div class="search-group">
+        <input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()">
+        <select id="orderStatusFilter" onchange="renderOrders()">
+          <option value="">全部狀態</option>
+          <option value="處理中">處理中</option>
+          <option value="已完成">已完成</option>
+          <option value="已取消">已取消</option>
+          <option value="已退款">已退款</option>
+        </select>
+        <select id="orderPeriodFilter" onchange="renderOrders()">
+          <option value="month">本月</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+    </div>
+    <div id="orderList" class="table-wrap"></div>
+  </section>
+
+  <!-- Products -->
+  <section id="tab-products" class="tab-content">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
+      <input id="prodSearch" type="text" placeholder="搜尋商品..." oninput="renderProducts()">
+    </div>
+    <div id="productList" class="table-wrap"></div>
+  </section>
+
+  <!-- Agents -->
+  <section id="tab-agents" class="tab-content">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAgentModal()">＋ 新增出單人</button>
+    </div>
+    <div id="agentList" class="table-wrap"></div>
+  </section>
+
+  <!-- Customers -->
+  <section id="tab-customers" class="tab-content">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openCustomerModal()">＋ 新增客戶</button>
+      <input id="custSearch" type="text" placeholder="搜尋客戶..." oninput="renderCustomers()">
+    </div>
+    <div id="customerList" class="table-wrap"></div>
+  </section>
+
+</div>
+
+<!-- Modal backdrop -->
+<div id="modalBg" class="modal-bg" onclick="closeModal()"></div>
+
+<!-- Product Modal -->
+<div id="productModal" class="modal">
+  <div class="modal-head">
+    <h3 id="prodModalTitle">新增商品</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <input id="pm_id" type="hidden">
+    <div class="form-row">
+      <div class="form-group"><label>平台/商品</label><input id="pm_platform" list="platformList" placeholder="YouTube Premium"><datalist id="platformList"></datalist></div>
+      <div class="form-group"><label>版本/類型</label><input id="pm_version" placeholder="家庭版"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>使用期間</label><input id="pm_duration" list="durationList" placeholder="1個月"><datalist id="durationList"><option value="1個月"><option value="3個月"><option value="6個月"><option value="12個月"></datalist></div>
+      <div class="form-group"><label>狀態</label><select id="pm_status"><option>啟用</option><option>停用</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>成本 (NT$)</label><input id="pm_cost" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><label>售價 (NT$)</label><input id="pm_price" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>手續費類型</label><select id="pm_feeType"><option>百分比</option><option>固定金額</option></select></div>
+      <div class="form-group"><label>手續費值</label><input id="pm_feeVal" type="number" min="0" step="0.01" placeholder="0.03"></div>
+    </div>
+    <div class="form-group"><label>提供資料</label><input id="pm_reqInfo" placeholder="電子信箱/密碼"></div>
+    <div class="form-group"><label>備註</label><input id="pm_notes" placeholder=""></div>
+    <div class="preview-box" id="prodPreview"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveProduct()">儲存</button>
+  </div>
+</div>
+
+<!-- Order Modal -->
+<div id="orderModal" class="modal modal-lg">
+  <div class="modal-head">
+    <h3 id="orderModalTitle">新增訂單</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <input id="om_id" type="hidden">
+    <div class="form-row">
+      <div class="form-group"><label>日期</label><input id="om_date" type="date"></div>
+      <div class="form-group"><label>訂單編號</label><input id="om_orderNo" readonly></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>出單人</label><select id="om_agent"></select></div>
+      <div class="form-group"><label>客戶</label><select id="om_customer"><option value="">（無）</option></select></div>
+    </div>
+    <div class="form-group">
+      <label>選擇商品</label>
+      <select id="om_product" onchange="onProductSelect()"><option value="">— 選擇商品 —</option></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>數量</label><input id="om_qty" type="number" min="1" value="1" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
+      <div class="form-group"><label>售價/件</label><input id="om_unitPrice" type="number" min="0" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>成本/件</label><input id="om_unitCost" type="number" min="0" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
+      <div class="form-group"><label>狀態</label><select id="om_status"><option>處理中</option><option>已完成</option><option>已取消</option><option>已退款</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>到期日</label><input id="om_expiry" type="date"></div>
+      <div class="form-group"></div>
+    </div>
+    <div class="form-group"><label>備註</label><input id="om_notes" placeholder=""></div>
+    <div class="preview-box" id="orderPreview"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveOrder()">儲存</button>
+  </div>
+</div>
+
+<!-- Agent Modal -->
+<div id="agentModal" class="modal modal-sm">
+  <div class="modal-head">
+    <h3 id="agentModalTitle">新增出單人</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <input id="am_id" type="hidden">
+    <div class="form-group"><label>名稱</label><input id="am_name" placeholder="出單人名稱"></div>
+    <div class="form-row">
+      <div class="form-group"><label>抽成方式</label><select id="am_commType"><option>百分比</option><option>固定金額</option></select></div>
+      <div class="form-group"><label>抽成數值</label><input id="am_commVal" type="number" min="0" step="0.01" placeholder="0.2"></div>
+    </div>
+    <div class="form-group"><label>備註</label><input id="am_notes" placeholder=""></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveAgent()">儲存</button>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div id="customerModal" class="modal modal-sm">
+  <div class="modal-head">
+    <h3 id="custModalTitle">新增客戶</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <input id="cm_id" type="hidden">
+    <div class="form-group"><label>名稱</label><input id="cm_name" placeholder="客戶名稱"></div>
+    <div class="form-group"><label>聯絡方式</label><input id="cm_contact" placeholder="Line ID / Discord"></div>
+    <div class="form-group"><label>來源平台</label><input id="cm_platform" placeholder="蝦皮 / Dcard / 朋友介紹"></div>
+    <div class="form-group"><label>備註</label><input id="cm_notes" placeholder=""></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveCustomer()">儲存</button>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirmModal" class="modal modal-sm">
+  <div class="modal-head"><h3>確認</h3></div>
+  <div class="modal-body"><p id="confirmMsg"></p></div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn danger" id="confirmBtn">確認</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
