@@ -73,7 +73,9 @@ function enterApp(label) {
   $('loginPage').style.display = 'none';
   $('app').style.display = '';
   $('userLabel').textContent = label;
-  initDashMonth();
+  mpInit('mpDash', renderDashboard);
+  mpInit('mpOrders', renderOrders);
+  mpInit('mpAds', renderAds);
   loadAll();
 }
 function autoLogin() {
@@ -176,43 +178,83 @@ function monthAds(ym) {
     .reduce(function(s, a) { return s + (a.amount || 0) }, 0);
 }
 
-/* ──── Dashboard ──── */
-var dashShowAll = false;
-var dashYear, dashMon;
-function initDashMonth() {
+/* ──── Month Picker Component ──── */
+var mpState = {};
+var MON_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+function mpInit(id, onChange) {
   var d = new Date();
-  dashYear = d.getFullYear();
-  dashMon = d.getMonth(); // 0-based
-  updateMonthLabel();
+  mpState[id] = { year: d.getFullYear(), mon: d.getMonth(), all: false, open: false, onChange: onChange };
+  mpRender(id);
 }
-function updateMonthLabel() {
-  $('dashMonthLabel').textContent = dashYear + '/' + (dashMon + 1 < 10 ? '0' : '') + (dashMon + 1);
+function mpRender(id) {
+  var s = mpState[id], el = $(id);
+  if (!el) return;
+  var label = s.all ? '全部期間' : s.year + '/' + (s.mon + 1 < 10 ? '0' : '') + (s.mon + 1);
+  var curY = new Date().getFullYear(), curM = new Date().getMonth();
+  var html = '<button class="mp-arrow" onclick="mpShift(\'' + id + '\',-1)">‹</button>' +
+    '<span class="mp-label" onclick="mpToggle(\'' + id + '\')">' + label +
+    (s.open ? mpDropdown(id, curY, curM) : '') + '</span>' +
+    '<button class="mp-arrow" onclick="mpShift(\'' + id + '\',1)">›</button>' +
+    '<button class="btn sm ' + (s.all ? 'primary' : 'ghost') + ' mp-all" onclick="mpSetAll(\'' + id + '\')">全部</button>';
+  el.innerHTML = html;
 }
-function shiftMonth(dir) {
-  dashShowAll = false;
-  $('dashAllBtn').classList.remove('primary');
-  $('dashAllBtn').classList.add('ghost');
-  dashMon += dir;
-  if (dashMon < 0) { dashMon = 11; dashYear-- }
-  if (dashMon > 11) { dashMon = 0; dashYear++ }
-  updateMonthLabel();
-  renderDashboard();
+function mpDropdown(id, curY, curM) {
+  var s = mpState[id];
+  var h = '<div class="mp-dropdown" onclick="event.stopPropagation()">' +
+    '<div class="mp-year-row"><button class="mp-year-btn" onclick="mpShiftYear(\'' + id + '\',-1)">‹</button>' +
+    '<span>' + s.year + '</span>' +
+    '<button class="mp-year-btn" onclick="mpShiftYear(\'' + id + '\',1)">›</button></div>' +
+    '<div class="mp-grid">';
+  for (var i = 0; i < 12; i++) {
+    var cls = '';
+    if (!s.all && s.mon === i) cls = ' active';
+    else if (s.year === curY && i === curM) cls = ' current';
+    h += '<button class="' + cls + '" onclick="mpPick(\'' + id + '\',' + i + ')">' + MON_NAMES[i] + '</button>';
+  }
+  h += '</div></div>';
+  return h;
 }
-function setDashAll() {
-  dashShowAll = !dashShowAll;
-  $('dashAllBtn').classList.toggle('primary', dashShowAll);
-  $('dashAllBtn').classList.toggle('ghost', !dashShowAll);
-  renderDashboard();
+function mpToggle(id) { mpState[id].open = !mpState[id].open; mpRender(id) }
+function mpShift(id, dir) {
+  var s = mpState[id]; s.all = false; s.open = false;
+  s.mon += dir;
+  if (s.mon < 0) { s.mon = 11; s.year-- }
+  if (s.mon > 11) { s.mon = 0; s.year++ }
+  mpRender(id); s.onChange();
 }
-function getDashYM() {
-  return dashYear + '-' + (dashMon + 1 < 10 ? '0' : '') + (dashMon + 1);
+function mpShiftYear(id, dir) {
+  mpState[id].year += dir; mpRender(id);
 }
+function mpPick(id, mon) {
+  var s = mpState[id]; s.mon = mon; s.all = false; s.open = false;
+  mpRender(id); s.onChange();
+}
+function mpSetAll(id) {
+  var s = mpState[id]; s.all = !s.all; s.open = false;
+  mpRender(id); s.onChange();
+}
+function mpGetYM(id) {
+  var s = mpState[id];
+  return s.year + '-' + (s.mon + 1 < 10 ? '0' : '') + (s.mon + 1);
+}
+function mpIsAll(id) { return mpState[id] && mpState[id].all }
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.mp-label')) {
+    var changed = false;
+    Object.keys(mpState).forEach(function(id) {
+      if (mpState[id].open) { mpState[id].open = false; changed = true; mpRender(id) }
+    });
+  }
+});
+
+/* ──── Dashboard ──── */
 function renderDashboard() {
-  if (!dashYear) initDashMonth();
-  updateMonthLabel();
-  var ym = getDashYM();
+  var ym = mpGetYM('mpDash');
+  var isAll = mpIsAll('mpDash');
   var filtered = orders.filter(function(o) {
-    if (dashShowAll) return true;
+    if (isAll) return true;
     return (o.order_date || '').slice(0, 7) === ym;
   });
   var completed = filtered.filter(function(o) { return o.status === '已完成' });
@@ -224,7 +266,7 @@ function renderDashboard() {
   });
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
-  var adTotal = dashShowAll
+  var adTotal = isAll
     ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0)
     : monthAds(ym);
   var netProfit = orderProf - adTotal;
@@ -274,8 +316,8 @@ function renderDashboard() {
     '<tr><td><span class="badge ok">個人</span></td><td class="text-right">' + chPersonal.cnt + '</td><td class="text-right">NT$' + fmtN(chPersonal.rev) + '</td><td class="text-right text-green">NT$' + fmtN(chPersonal.prof) + '</td><td class="text-right">' + fmtP(chPersonal.rev > 0 ? chPersonal.prof / chPersonal.rev : 0) + '</td></tr>' +
     '</table>';
 
-  // Recent orders
-  var recent = orders.slice(0, 8);
+  // Recent orders (filtered by period)
+  var recent = filtered.slice(0, 8);
   if (recent.length === 0) {
     $('recentOrders').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
   } else {
@@ -454,12 +496,12 @@ function renderOrders() {
   var q = ($('orderSearch').value || '').toLowerCase();
   var status = $('orderStatusFilter').value;
   var channel = $('orderChannelFilter').value;
-  var period = $('orderPeriodFilter').value;
-  var ym = today().slice(0, 7);
+  var ym = mpGetYM('mpOrders');
+  var isAll = mpIsAll('mpOrders');
   var list = orders.filter(function(o) {
     if (status && o.status !== status) return false;
     if (channel && (o.channel || '8591') !== channel) return false;
-    if (period === 'month' && (o.order_date || '').slice(0, 7) !== ym) return false;
+    if (!isAll && (o.order_date || '').slice(0, 7) !== ym) return false;
     if (q) {
       var s = (o.order_no + o.platform + o.version + o.notes + getAgentName(o.agent_id) + getCustomerName(o.customer_id)).toLowerCase();
       if (s.indexOf(q) < 0) return false;
@@ -846,11 +888,11 @@ function deleteCustomer(id) {
 
 /* ──── Ads ──── */
 function renderAds() {
-  var period = $('adPeriodFilter').value;
-  var ym = today().slice(0, 7);
+  var ym = mpGetYM('mpAds');
+  var isAll = mpIsAll('mpAds');
   var list = ads.filter(function(a) {
-    if (period === 'month') return (a.ad_date || '').slice(0, 7) === ym;
-    return true;
+    if (isAll) return true;
+    return (a.ad_date || '').slice(0, 7) === ym;
   });
 
   // Stats by platform
