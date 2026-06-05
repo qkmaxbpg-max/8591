@@ -59,6 +59,7 @@
     <button class="tab" data-tab="products" onclick="switchTab('products')">商品</button>
     <button class="tab" data-tab="agents" onclick="switchTab('agents')">出單人</button>
     <button class="tab" data-tab="customers" onclick="switchTab('customers')">客戶</button>
+    <button class="tab" data-tab="ads" onclick="switchTab('ads')">廣告</button>
   </nav>
 
   <!-- Dashboard -->
@@ -75,6 +76,10 @@
       <div id="platformChart" class="chart-area"></div>
     </div>
     <div class="card">
+      <div class="card-head"><h3>管道比較</h3></div>
+      <div id="channelStats" class="table-wrap"></div>
+    </div>
+    <div class="card">
       <div class="card-head"><h3>近期訂單</h3></div>
       <div id="recentOrders" class="table-wrap"></div>
     </div>
@@ -86,6 +91,11 @@
       <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
       <div class="search-group">
         <input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()">
+        <select id="orderChannelFilter" onchange="renderOrders()">
+          <option value="">全部管道</option>
+          <option value="8591">8591</option>
+          <option value="個人">個人</option>
+        </select>
         <select id="orderStatusFilter" onchange="renderOrders()">
           <option value="">全部狀態</option>
           <option value="處理中">處理中</option>
@@ -108,7 +118,7 @@
       <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
       <input id="prodSearch" type="text" placeholder="搜尋商品..." oninput="renderProducts()">
     </div>
-    <div id="productList" class="table-wrap"></div>
+    <div id="productList"></div>
   </section>
 
   <!-- Agents -->
@@ -126,6 +136,19 @@
       <input id="custSearch" type="text" placeholder="搜尋客戶..." oninput="renderCustomers()">
     </div>
     <div id="customerList" class="table-wrap"></div>
+  </section>
+
+  <!-- Ads -->
+  <section id="tab-ads" class="tab-content">
+    <div class="toolbar">
+      <button class="btn primary" onclick="openAdModal()">＋ 新增廣告支出</button>
+      <select id="adPeriodFilter" onchange="renderAds()">
+        <option value="month">本月</option>
+        <option value="all">全部</option>
+      </select>
+    </div>
+    <div class="stat-cards" id="adStatCards"></div>
+    <div id="adList" class="table-wrap"></div>
   </section>
 
 </div>
@@ -153,10 +176,6 @@
       <div class="form-group"><label>成本 (NT$)</label><input id="pm_cost" type="number" min="0" placeholder="0"></div>
       <div class="form-group"><label>售價 (NT$)</label><input id="pm_price" type="number" min="0" placeholder="0"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>手續費類型</label><select id="pm_feeType"><option>百分比</option><option>固定金額</option></select></div>
-      <div class="form-group"><label>手續費值</label><input id="pm_feeVal" type="number" min="0" step="0.01" placeholder="0.03"></div>
-    </div>
     <div class="form-group"><label>提供資料</label><input id="pm_reqInfo" placeholder="電子信箱/密碼"></div>
     <div class="form-group"><label>備註</label><input id="pm_notes" placeholder=""></div>
     <div class="preview-box" id="prodPreview"></div>
@@ -177,22 +196,25 @@
     <input id="om_id" type="hidden">
     <div class="form-row">
       <div class="form-group"><label>日期</label><input id="om_date" type="date"></div>
-      <div class="form-group"><label>訂單編號</label><input id="om_orderNo" readonly></div>
+      <div class="form-group"><label>銷售管道</label><select id="om_channel" onchange="onChannelChange()"><option value="8591">8591</option><option value="個人">個人</option></select></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>出單人</label><select id="om_agent"></select></div>
+      <div class="form-group"><label>出單人</label><select id="om_agent" onchange="calcOrderPreview()"></select></div>
       <div class="form-group"><label>客戶</label><select id="om_customer"><option value="">（無）</option></select></div>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="om_productGroup">
       <label>選擇商品</label>
       <select id="om_product" onchange="onProductSelect()"><option value="">— 選擇商品 —</option></select>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>數量</label><input id="om_qty" type="number" min="1" value="1" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
-      <div class="form-group"><label>售價/件</label><input id="om_unitPrice" type="number" min="0" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
+    <div id="om_manualGroup" style="display:none">
+      <div class="form-group"><label>商品名稱</label><input id="om_manualName" placeholder="手動輸入商品名稱"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>成本/件</label><input id="om_unitCost" type="number" min="0" onchange="calcOrderPreview()" oninput="calcOrderPreview()"></div>
+      <div class="form-group"><label>數量</label><input id="om_qty" type="number" min="1" value="1" oninput="calcOrderPreview()"></div>
+      <div class="form-group"><label>售價/件</label><input id="om_unitPrice" type="number" min="0" oninput="calcOrderPreview()"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>成本/件</label><input id="om_unitCost" type="number" min="0" oninput="calcOrderPreview()"></div>
       <div class="form-group"><label>狀態</label><select id="om_status"><option>處理中</option><option>已完成</option><option>已取消</option><option>已退款</option></select></div>
     </div>
     <div class="form-row">
@@ -245,6 +267,27 @@
   <div class="modal-foot">
     <button class="btn ghost" onclick="closeModal()">取消</button>
     <button class="btn primary" onclick="saveCustomer()">儲存</button>
+  </div>
+</div>
+
+<!-- Ad Modal -->
+<div id="adModal" class="modal modal-sm">
+  <div class="modal-head">
+    <h3 id="adModalTitle">新增廣告支出</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <input id="ad_id" type="hidden">
+    <div class="form-row">
+      <div class="form-group"><label>日期</label><input id="ad_date" type="date"></div>
+      <div class="form-group"><label>金額 (NT$)</label><input id="ad_amount" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-group"><label>廣告平台</label><input id="ad_platform" list="adPlatformList" placeholder="Dcard / FB / 蝦皮"><datalist id="adPlatformList"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google Ads"></datalist></div>
+    <div class="form-group"><label>備註</label><input id="ad_notes" placeholder=""></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveAd()">儲存</button>
   </div>
 </div>
 
