@@ -73,6 +73,7 @@ function enterApp(label) {
   $('loginPage').style.display = 'none';
   $('app').style.display = '';
   $('userLabel').textContent = label;
+  initDashMonth();
   loadAll();
 }
 function autoLogin() {
@@ -176,12 +177,23 @@ function monthAds(ym) {
 }
 
 /* ──── Dashboard ──── */
+var dashShowAll = false;
+function setDashAll() {
+  dashShowAll = !dashShowAll;
+  $('dashAllBtn').classList.toggle('primary', dashShowAll);
+  $('dashAllBtn').classList.toggle('ghost', !dashShowAll);
+  $('dashMonth').disabled = dashShowAll;
+  renderDashboard();
+}
+function initDashMonth() {
+  $('dashMonth').value = today().slice(0, 7);
+}
 function renderDashboard() {
-  var period = $('dashPeriod').value;
-  var ym = today().slice(0, 7);
+  if (!$('dashMonth').value) initDashMonth();
+  var ym = $('dashMonth').value;
   var filtered = orders.filter(function(o) {
-    if (period === 'month') return (o.order_date || '').slice(0, 7) === ym;
-    return true;
+    if (dashShowAll) return true;
+    return (o.order_date || '').slice(0, 7) === ym;
   });
   var completed = filtered.filter(function(o) { return o.status === '已完成' });
 
@@ -192,8 +204,9 @@ function renderDashboard() {
   });
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
-  var adTotal = period === 'month' ? monthAds(ym) :
-    ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0);
+  var adTotal = dashShowAll
+    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0)
+    : monthAds(ym);
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
 
