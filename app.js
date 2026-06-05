@@ -183,13 +183,13 @@ var mpState = {};
 var MON_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 function mpInit(id, onChange) {
   var d = new Date();
-  mpState[id] = { year: d.getFullYear(), mon: d.getMonth(), all: false, open: false, onChange: onChange };
+  mpState[id] = { year: d.getFullYear(), mon: d.getMonth(), all: false, mode: 'month', open: false, onChange: onChange };
   mpRender(id);
 }
 function mpRender(id) {
   var s = mpState[id], el = $(id);
   if (!el) return;
-  var label = s.all ? '全部期間' : s.year + '/' + (s.mon + 1 < 10 ? '0' : '') + (s.mon + 1);
+  var label = s.all ? '全部期間' : s.mode === 'year' ? s.year + '年' : s.year + '/' + (s.mon + 1 < 10 ? '0' : '') + (s.mon + 1);
   var curY = new Date().getFullYear(), curM = new Date().getMonth();
   var html = '<button class="mp-arrow" onclick="mpShift(\'' + id + '\',-1)">‹</button>' +
     '<span class="mp-label" onclick="mpToggle(\'' + id + '\')">' + label +
@@ -200,14 +200,15 @@ function mpRender(id) {
 }
 function mpDropdown(id, curY, curM) {
   var s = mpState[id];
+  var yearCls = s.mode === 'year' && !s.all ? ' active' : '';
   var h = '<div class="mp-dropdown" onclick="event.stopPropagation()">' +
     '<div class="mp-year-row"><button class="mp-year-btn" onclick="mpShiftYear(\'' + id + '\',-1)">‹</button>' +
-    '<span>' + s.year + '</span>' +
+    '<button class="mp-year-pick' + yearCls + '" onclick="mpPickYear(\'' + id + '\')">' + s.year + '年</button>' +
     '<button class="mp-year-btn" onclick="mpShiftYear(\'' + id + '\',1)">›</button></div>' +
     '<div class="mp-grid">';
   for (var i = 0; i < 12; i++) {
     var cls = '';
-    if (!s.all && s.mon === i) cls = ' active';
+    if (!s.all && s.mode !== 'year' && s.mon === i) cls = ' active';
     else if (s.year === curY && i === curM) cls = ' current';
     h += '<button class="' + cls + '" onclick="mpPick(\'' + id + '\',' + i + ')">' + MON_NAMES[i] + '</button>';
   }
@@ -217,16 +218,24 @@ function mpDropdown(id, curY, curM) {
 function mpToggle(id) { mpState[id].open = !mpState[id].open; mpRender(id) }
 function mpShift(id, dir) {
   var s = mpState[id]; s.all = false; s.open = false;
-  s.mon += dir;
-  if (s.mon < 0) { s.mon = 11; s.year-- }
-  if (s.mon > 11) { s.mon = 0; s.year++ }
+  if (s.mode === 'year') {
+    s.year += dir;
+  } else {
+    s.mon += dir;
+    if (s.mon < 0) { s.mon = 11; s.year-- }
+    if (s.mon > 11) { s.mon = 0; s.year++ }
+  }
   mpRender(id); s.onChange();
 }
 function mpShiftYear(id, dir) {
   mpState[id].year += dir; mpRender(id);
 }
 function mpPick(id, mon) {
-  var s = mpState[id]; s.mon = mon; s.all = false; s.open = false;
+  var s = mpState[id]; s.mon = mon; s.all = false; s.mode = 'month'; s.open = false;
+  mpRender(id); s.onChange();
+}
+function mpPickYear(id) {
+  var s = mpState[id]; s.all = false; s.mode = 'year'; s.open = false;
   mpRender(id); s.onChange();
 }
 function mpSetAll(id) {
@@ -238,6 +247,8 @@ function mpGetYM(id) {
   return s.year + '-' + (s.mon + 1 < 10 ? '0' : '') + (s.mon + 1);
 }
 function mpIsAll(id) { return mpState[id] && mpState[id].all }
+function mpIsYear(id) { return mpState[id] && mpState[id].mode === 'year' }
+function mpGetYear(id) { return String(mpState[id].year) }
 
 // Close dropdown on outside click
 document.addEventListener('click', function(e) {
@@ -253,9 +264,13 @@ document.addEventListener('click', function(e) {
 function renderDashboard() {
   var ym = mpGetYM('mpDash');
   var isAll = mpIsAll('mpDash');
+  var isYear = mpIsYear('mpDash');
+  var yy = mpGetYear('mpDash');
   var filtered = orders.filter(function(o) {
     if (isAll) return true;
-    return (o.order_date || '').slice(0, 7) === ym;
+    var d = o.order_date || '';
+    if (isYear) return d.slice(0, 4) === yy;
+    return d.slice(0, 7) === ym;
   });
   var completed = filtered.filter(function(o) { return o.status === '已完成' });
 
@@ -268,7 +283,9 @@ function renderDashboard() {
 
   var adTotal = isAll
     ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0)
-    : monthAds(ym);
+    : isYear
+      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy }).reduce(function(s, a) { return s + (a.amount || 0) }, 0)
+      : monthAds(ym);
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
 
@@ -498,10 +515,15 @@ function renderOrders() {
   var channel = $('orderChannelFilter').value;
   var ym = mpGetYM('mpOrders');
   var isAll = mpIsAll('mpOrders');
+  var isYear = mpIsYear('mpOrders');
+  var yy = mpGetYear('mpOrders');
   var list = orders.filter(function(o) {
     if (status && o.status !== status) return false;
     if (channel && (o.channel || '8591') !== channel) return false;
-    if (!isAll && (o.order_date || '').slice(0, 7) !== ym) return false;
+    if (!isAll) {
+      var d = o.order_date || '';
+      if (isYear ? d.slice(0, 4) !== yy : d.slice(0, 7) !== ym) return false;
+    }
     if (q) {
       var s = (o.order_no + o.platform + o.version + o.notes + getAgentName(o.agent_id) + getCustomerName(o.customer_id)).toLowerCase();
       if (s.indexOf(q) < 0) return false;
@@ -890,9 +912,13 @@ function deleteCustomer(id) {
 function renderAds() {
   var ym = mpGetYM('mpAds');
   var isAll = mpIsAll('mpAds');
+  var isYear = mpIsYear('mpAds');
+  var yy = mpGetYear('mpAds');
   var list = ads.filter(function(a) {
     if (isAll) return true;
-    return (a.ad_date || '').slice(0, 7) === ym;
+    var d = a.ad_date || '';
+    if (isYear) return d.slice(0, 4) === yy;
+    return d.slice(0, 7) === ym;
   });
 
   // Stats by platform
