@@ -175,6 +175,29 @@ tr:hover td{background:var(--bg2)}
 .mp-grid button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .mp-grid button.current{border-color:var(--accent);color:var(--accent)}
 
+/* Date picker */
+.dp-wrap{position:relative}
+.dp-display{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--bg4);border-radius:var(--radius-sm);background:var(--bg2);color:var(--fg0);cursor:pointer;transition:var(--transition);font-size:inherit;min-height:38px}
+.dp-display:hover{border-color:var(--accent)}
+.dp-display.focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.dp-display .dp-icon{color:var(--fg3);font-size:.85rem}
+.dp-display .dp-clear{color:var(--fg3);font-size:.9rem;cursor:pointer;padding:0 2px;line-height:1}
+.dp-display .dp-clear:hover{color:var(--red)}
+.dp-panel{position:absolute;top:calc(100% + 4px);left:0;min-width:280px;background:var(--bg1);border:1px solid var(--bg4);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px;z-index:300}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dp-head span{font-weight:700;font-size:.9rem}
+.dp-head button{background:none;border:none;color:var(--fg2);font-size:1rem;cursor:pointer;padding:4px 8px;border-radius:4px}
+.dp-head button:hover{color:var(--fg0);background:var(--bg3)}
+.dp-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.dp-weekdays span{text-align:center;font-size:.7rem;color:var(--fg3);font-weight:600;padding:2px 0}
+.dp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-days button{padding:6px 0;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--fg1);font-size:.8rem;cursor:pointer;transition:var(--transition)}
+.dp-days button:hover{background:var(--bg3);color:var(--fg0)}
+.dp-days button.today{border:1px solid var(--accent);color:var(--accent)}
+.dp-days button.selected{background:var(--accent);color:#fff}
+.dp-days button.other{color:var(--fg3);opacity:.4}
+.dp-days button.other:hover{opacity:.7}
+
 /* Safe area (iPhone notch) */
 #topBar{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
 #tabBar{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}

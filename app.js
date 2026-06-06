@@ -260,6 +260,120 @@ document.addEventListener('click', function(e) {
   }
 });
 
+/* ──── Date Picker Component ──── */
+var dpState = {};
+var WDAY = ['日','一','二','三','四','五','六'];
+function dpInit(id, opts) {
+  opts = opts || {};
+  dpState[id] = { value: opts.value || '', open: false, viewYear: 0, viewMonth: 0, allowEmpty: !!opts.allowEmpty, onChange: opts.onChange || function(){} };
+  var s = dpState[id];
+  if (s.value) { var p = s.value.split('-'); s.viewYear = +p[0]; s.viewMonth = +p[1] - 1 }
+  else { var d = new Date(); s.viewYear = d.getFullYear(); s.viewMonth = d.getMonth() }
+  dpRender(id);
+}
+function dpRender(id) {
+  var el = $(id), s = dpState[id]; if (!el) return;
+  var display = s.value || '選擇日期';
+  var clearBtn = s.value && s.allowEmpty ? ' <span class="dp-clear" data-dp-clear="' + id + '">✕</span>' : '';
+  var h = '<div class="dp-display' + (s.open ? ' focus' : '') + '" data-dp-toggle="' + id + '">' +
+    '<span>' + display + '</span><span class="dp-icon">📅' + clearBtn + '</span></div>';
+  if (s.open) h += dpPanel(id);
+  el.innerHTML = h;
+}
+function dpPanel(id) {
+  var s = dpState[id];
+  var y = s.viewYear, m = s.viewMonth;
+  var todayStr = today();
+  var h = '<div class="dp-panel" onclick="event.stopPropagation()">' +
+    '<div class="dp-head"><button data-dp-shift="' + id + ',-1">‹</button>' +
+    '<span>' + y + '/' + (m + 1 < 10 ? '0' : '') + (m + 1) + '</span>' +
+    '<button data-dp-shift="' + id + ',1">›</button></div>' +
+    '<div class="dp-weekdays">';
+  for (var w = 0; w < 7; w++) h += '<span>' + WDAY[w] + '</span>';
+  h += '</div><div class="dp-days">';
+  var first = new Date(y, m, 1), startDay = first.getDay();
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var prevDays = new Date(y, m, 0).getDate();
+  // Previous month padding
+  for (var i = startDay - 1; i >= 0; i--) {
+    var pd = prevDays - i;
+    var pym = m === 0 ? (y - 1) + '-12' : y + '-' + (m < 10 ? '0' : '') + m;
+    h += '<button class="other" data-dp-pick="' + id + ',' + pym + '-' + (pd < 10 ? '0' : '') + pd + '">' + pd + '</button>';
+  }
+  // Current month
+  for (var d = 1; d <= daysInMonth; d++) {
+    var ds = y + '-' + (m + 1 < 10 ? '0' : '') + (m + 1) + '-' + (d < 10 ? '0' : '') + d;
+    var cls = '';
+    if (ds === s.value) cls = ' selected';
+    else if (ds === todayStr) cls = ' today';
+    h += '<button class="' + cls + '" data-dp-pick="' + id + ',' + ds + '">' + d + '</button>';
+  }
+  // Next month padding
+  var totalCells = startDay + daysInMonth;
+  var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (var i = 1; i <= remaining; i++) {
+    var nm = m + 2; var ny = y; if (nm > 12) { nm = 1; ny++ }
+    var nds = ny + '-' + (nm < 10 ? '0' : '') + nm + '-' + (i < 10 ? '0' : '') + i;
+    h += '<button class="other" data-dp-pick="' + id + ',' + nds + '">' + i + '</button>';
+  }
+  h += '</div></div>';
+  return h;
+}
+function dpGetVal(id) { return dpState[id] ? dpState[id].value : '' }
+function dpSetVal(id, val) {
+  if (!dpState[id]) return;
+  dpState[id].value = val || '';
+  if (val) { var p = val.split('-'); dpState[id].viewYear = +p[0]; dpState[id].viewMonth = +p[1] - 1 }
+  dpRender(id);
+}
+
+// Date picker event delegation
+document.addEventListener('click', function(e) {
+  var tog = e.target.closest('[data-dp-toggle]');
+  if (tog) {
+    var id = tog.getAttribute('data-dp-toggle');
+    dpState[id].open = !dpState[id].open;
+    dpRender(id);
+    e.stopPropagation();
+    return;
+  }
+  var clr = e.target.closest('[data-dp-clear]');
+  if (clr) {
+    var id = clr.getAttribute('data-dp-clear');
+    dpState[id].value = '';
+    dpState[id].open = false;
+    dpRender(id);
+    dpState[id].onChange(id, '');
+    e.stopPropagation();
+    return;
+  }
+  var shift = e.target.closest('[data-dp-shift]');
+  if (shift) {
+    var parts = shift.getAttribute('data-dp-shift').split(',');
+    var id = parts[0], dir = +parts[1];
+    dpState[id].viewMonth += dir;
+    if (dpState[id].viewMonth < 0) { dpState[id].viewMonth = 11; dpState[id].viewYear-- }
+    if (dpState[id].viewMonth > 11) { dpState[id].viewMonth = 0; dpState[id].viewYear++ }
+    dpRender(id);
+    return;
+  }
+  var pick = e.target.closest('[data-dp-pick]');
+  if (pick) {
+    var parts = pick.getAttribute('data-dp-pick').split(',');
+    var id = parts[0], val = parts[1];
+    dpState[id].value = val;
+    dpState[id].open = false;
+    var p = val.split('-'); dpState[id].viewYear = +p[0]; dpState[id].viewMonth = +p[1] - 1;
+    dpRender(id);
+    dpState[id].onChange(id, val);
+    return;
+  }
+  // Close all open date pickers on outside click
+  Object.keys(dpState).forEach(function(id) {
+    if (dpState[id].open) { dpState[id].open = false; dpRender(id) }
+  });
+});
+
 /* ──── Dashboard ──── */
 function renderDashboard() {
   var ym = mpGetYM('mpDash');
@@ -583,7 +697,7 @@ function onChannelChange() {
 function openOrderModal(item) {
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
   $('om_id').value = item ? item.id : '';
-  $('om_date').value = item ? item.order_date : today();
+  dpInit('om_date', { value: item ? item.order_date : today() });
   $('om_channel').value = item ? (item.channel || '8591') : '8591';
 
   var agHtml = '<option value="">（自己）</option>';
@@ -621,7 +735,7 @@ function openOrderModal(item) {
   $('om_unitPrice').value = item ? item.unit_price : '';
   $('om_unitCost').value = item ? item.unit_cost : '';
   $('om_status').value = item ? item.status : '處理中';
-  $('om_expiry').value = item ? (item.expiry_date || '') : '';
+  dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
   $('om_notes').value = item ? (item.notes || '') : '';
   $('om_manualName').value = item ? (item.platform || '') : '';
 
@@ -640,9 +754,9 @@ function onProductSelect() {
     var dur = p.duration || '';
     var months = parseInt(dur) || 0;
     if (months > 0) {
-      var d = new Date($('om_date').value || today());
+      var d = new Date(dpGetVal('om_date') || today());
       d.setMonth(d.getMonth() + months);
-      $('om_expiry').value = d.toISOString().slice(0, 10);
+      dpSetVal('om_expiry', d.toISOString().slice(0, 10));
     }
     calcOrderPreview();
   }
@@ -686,7 +800,7 @@ function saveOrder() {
   var manualName = $('om_manualName').value.trim();
 
   var obj = {
-    order_date: $('om_date').value,
+    order_date: dpGetVal('om_date'),
     order_no: genOrderNo(),
     agent_id: agId,
     customer_id: $('om_customer').value || null,
@@ -703,7 +817,7 @@ function saveOrder() {
     fee_value: ch === '8591' ? PLATFORM_FEE : 0,
     commission_type: ag ? ag.commission_type : '百分比',
     commission_value: ag ? ag.commission_value : 0,
-    expiry_date: $('om_expiry').value || null,
+    expiry_date: dpGetVal('om_expiry') || null,
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
@@ -955,7 +1069,7 @@ function renderAds() {
 function openAdModal(item) {
   $('adModalTitle').textContent = item ? '編輯廣告支出' : '新增廣告支出';
   $('ad_id').value = item ? item.id : '';
-  $('ad_date').value = item ? item.ad_date : today();
+  dpInit('ad_date', { value: item ? item.ad_date : today() });
   $('ad_amount').value = item ? item.amount : '';
   $('ad_platform').value = item ? (item.ad_platform || '') : '8591';
   $('ad_notes').value = item ? (item.notes || '') : '';
@@ -967,7 +1081,7 @@ function editAd(id) {
 }
 function saveAd() {
   var obj = {
-    ad_date: $('ad_date').value,
+    ad_date: dpGetVal('ad_date'),
     amount: Number($('ad_amount').value) || 0,
     ad_platform: $('ad_platform').value.trim(),
     notes: $('ad_notes').value.trim()

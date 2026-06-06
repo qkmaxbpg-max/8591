@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -188,7 +188,7 @@
   <div class="modal-body">
     <input id="om_id" type="hidden">
     <div class="form-row">
-      <div class="form-group"><label>日期</label><input id="om_date" type="date"></div>
+      <div class="form-group"><label>日期</label><div id="om_date" class="dp-wrap"></div></div>
       <div class="form-group"><label>銷售管道</label><select id="om_channel" onchange="onChannelChange()"><option value="8591">8591</option><option value="個人">個人</option></select></div>
     </div>
     <div class="form-row">
@@ -211,7 +211,7 @@
       <div class="form-group"><label>狀態</label><select id="om_status"><option>處理中</option><option>已完成</option><option>已取消</option><option>已退款</option></select></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>到期日</label><input id="om_expiry" type="date"></div>
+      <div class="form-group"><label>到期日</label><div id="om_expiry" class="dp-wrap"></div></div>
       <div class="form-group"></div>
     </div>
     <div class="form-group"><label>備註</label><input id="om_notes" placeholder=""></div>
@@ -272,7 +272,7 @@
   <div class="modal-body">
     <input id="ad_id" type="hidden">
     <div class="form-row">
-      <div class="form-group"><label>日期</label><input id="ad_date" type="date"></div>
+      <div class="form-group"><label>日期</label><div id="ad_date" class="dp-wrap"></div></div>
       <div class="form-group"><label>金額 (NT$)</label><input id="ad_amount" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="form-group"><label>廣告平台</label><input id="ad_platform" list="adPlatformList" placeholder="8591 / Dcard / FB"><datalist id="adPlatformList"><option value="8591"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google Ads"></datalist></div>
@@ -295,6 +295,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
