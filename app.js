@@ -407,8 +407,8 @@ function renderProducts() {
           '<td>' + (p.status === '啟用' ? '<span class="badge active">啟用</span>' : '<span class="badge inactive">停用</span>') + '</td>' +
           '<td class="text-sm">' + esc(p.required_info || '') + '</td>' +
           '<td><div class="act-group">' +
-            '<button class="act-btn edit" onclick="editProduct(\'' + p.id + '\')">編輯</button>' +
-            '<button class="act-btn del" onclick="deleteProduct(\'' + p.id + '\')">刪除</button>' +
+            '<button class="act-btn edit" data-action="editProduct" data-id="' + p.id + '">編輯</button>' +
+            '<button class="act-btn del" data-action="deleteProduct" data-id="' + p.id + '">刪除</button>' +
           '</div></td></tr>';
       });
       html += '</table>';
@@ -557,8 +557,8 @@ function renderOrders() {
       '<td>' + statusBadge(o.status) + '</td>' +
       '<td class="' + expiryWarn + '">' + (expiry ? expiry.slice(5) : '') + '</td>' +
       '<td><div class="act-group">' +
-        '<button class="act-btn edit" onclick="editOrder(\'' + o.id + '\')">編輯</button>' +
-        '<button class="act-btn del" onclick="deleteOrder(\'' + o.id + '\')">刪除</button>' +
+        '<button class="act-btn edit" data-action="editOrder" data-id="' + o.id + '">編輯</button>' +
+        '<button class="act-btn del" data-action="deleteOrder" data-id="' + o.id + '">刪除</button>' +
       '</div></td></tr>';
   });
   $('orderList').innerHTML = h + '</table>';
@@ -763,8 +763,8 @@ function renderAgents() {
       '<td class="text-right ' + (totalProfit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(totalProfit) + '</td>' +
       '<td>' + esc(a.notes || '') + '</td>' +
       '<td><div class="act-group">' +
-        '<button class="act-btn edit" onclick="editAgent(\'' + a.id + '\')">編輯</button>' +
-        '<button class="act-btn del" onclick="deleteAgent(\'' + a.id + '\')">刪除</button>' +
+        '<button class="act-btn edit" data-action="editAgent" data-id="' + a.id + '">編輯</button>' +
+        '<button class="act-btn del" data-action="deleteAgent" data-id="' + a.id + '">刪除</button>' +
       '</div></td></tr>';
   });
   $('agentList').innerHTML = h + '</table>';
@@ -846,8 +846,8 @@ function renderCustomers() {
       '<td class="text-right">NT$' + fmtN(total) + '</td>' +
       '<td>' + esc(c.notes || '') + '</td>' +
       '<td><div class="act-group">' +
-        '<button class="act-btn edit" onclick="editCustomer(\'' + c.id + '\')">編輯</button>' +
-        '<button class="act-btn del" onclick="deleteCustomer(\'' + c.id + '\')">刪除</button>' +
+        '<button class="act-btn edit" data-action="editCustomer" data-id="' + c.id + '">編輯</button>' +
+        '<button class="act-btn del" data-action="deleteCustomer" data-id="' + c.id + '">刪除</button>' +
       '</div></td></tr>';
   });
   $('customerList').innerHTML = h + '</table>';
@@ -946,8 +946,8 @@ function renderAds() {
       '<td class="text-right text-red">NT$' + fmtN(a.amount) + '</td>' +
       '<td>' + esc(a.notes || '') + '</td>' +
       '<td><div class="act-group">' +
-        '<button class="act-btn edit" onclick="editAd(\'' + a.id + '\')">編輯</button>' +
-        '<button class="act-btn del" onclick="deleteAd(\'' + a.id + '\')">刪除</button>' +
+        '<button class="act-btn edit" data-action="editAd" data-id="' + a.id + '">編輯</button>' +
+        '<button class="act-btn del" data-action="deleteAd" data-id="' + a.id + '">刪除</button>' +
       '</div></td></tr>';
   });
   $('adList').innerHTML = h + '</table>';
@@ -1014,6 +1014,26 @@ function doRefresh() {
   loadAll();
   toast('已重新整理', 'ok');
 }
+
+/* ──── Global Event Delegation ──── */
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  var action = btn.getAttribute('data-action');
+  var id = btn.getAttribute('data-id');
+  switch (action) {
+    case 'editProduct': editProduct(id); break;
+    case 'deleteProduct': deleteProduct(id); break;
+    case 'editOrder': editOrder(id); break;
+    case 'deleteOrder': deleteOrder(id); break;
+    case 'editAgent': editAgent(id); break;
+    case 'deleteAgent': deleteAgent(id); break;
+    case 'editCustomer': editCustomer(id); break;
+    case 'deleteCustomer': deleteCustomer(id); break;
+    case 'editAd': editAd(id); break;
+    case 'deleteAd': deleteAd(id); break;
+  }
+});
 
 /* ──── Utils ──── */
 function esc(s) {
