@@ -1222,6 +1222,255 @@ document.addEventListener('click', function(e) {
   }
 });
 
+/* ──── Settings ──── */
+function openSettings() {
+  $('set_apiKey').value = localStorage.getItem('proxy-api-key') || '';
+  openModal('settingsModal');
+}
+function saveSettings() {
+  var key = $('set_apiKey').value.trim();
+  if (key) localStorage.setItem('proxy-api-key', key);
+  else localStorage.removeItem('proxy-api-key');
+  closeModal();
+  toast('設定已儲存', 'ok');
+}
+
+/* ──── OCR Screenshot Import ──── */
+var ocrParsedOrders = [];
+var ocrImageBase64 = '';
+
+function openOcrModal() {
+  var key = localStorage.getItem('proxy-api-key');
+  if (!key) {
+    toast('請先到設定（⚙）填入 Anthropic API Key', 'err');
+    openSettings();
+    return;
+  }
+  resetOcr();
+  openModal('ocrModal');
+}
+
+function resetOcr() {
+  ocrParsedOrders = [];
+  ocrImageBase64 = '';
+  $('ocrPlaceholder').style.display = '';
+  $('ocrPreviewImg').style.display = 'none';
+  $('ocrStatus').style.display = 'none';
+  $('ocrResults').style.display = 'none';
+  $('btnOcrImport').style.display = 'none';
+  $('btnOcrRetry').style.display = 'none';
+  $('ocrFile').value = '';
+}
+
+// Click to upload
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#ocrPlaceholder')) {
+    $('ocrFile').click();
+  }
+});
+
+// Drag & drop
+document.addEventListener('dragover', function(e) {
+  var area = e.target.closest('#ocrUploadArea');
+  if (area) { e.preventDefault(); area.classList.add('dragover') }
+});
+document.addEventListener('dragleave', function(e) {
+  var area = e.target.closest('#ocrUploadArea');
+  if (area) area.classList.remove('dragover');
+});
+document.addEventListener('drop', function(e) {
+  var area = e.target.closest('#ocrUploadArea');
+  if (!area) return;
+  e.preventDefault();
+  area.classList.remove('dragover');
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleOcrFile(file);
+});
+
+function onOcrFileSelect(e) {
+  var file = e.target.files[0];
+  if (file) handleOcrFile(file);
+}
+
+function handleOcrFile(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result;
+    ocrImageBase64 = dataUrl.split(',')[1];
+    var mediaType = file.type || 'image/png';
+
+    // Show preview
+    $('ocrPreviewImg').src = dataUrl;
+    $('ocrPreviewImg').style.display = '';
+    $('ocrPlaceholder').style.display = 'none';
+    $('ocrStatus').style.display = 'flex';
+    $('btnOcrRetry').style.display = '';
+
+    // Call Claude API
+    callClaudeVision(ocrImageBase64, mediaType);
+  };
+  reader.readAsDataURL(file);
+}
+
+function callClaudeVision(base64, mediaType) {
+  var apiKey = localStorage.getItem('proxy-api-key');
+  if (!apiKey) { toast('請先設定 API Key', 'err'); return }
+
+  var prompt = '你是一個 8591 訂單資料擷取工具。請分析這張截圖中的所有訂單資料。\n\n' +
+    '每筆訂單請擷取以下欄位：\n' +
+    '- order_date: 下單時間（格式 YYYY-MM-DD）\n' +
+    '- platform: 商品平台（如 Discord Nitro, YouTube Premium, Netflix 等）\n' +
+    '- version: 品項詳情（如「加成3個月」「贈禮版/30天」等）\n' +
+    '- qty: 數量（數字）\n' +
+    '- unit_price: 售價（數字，不含$符號）\n' +
+    '- buyer: 買家編號\n' +
+    '- status: 狀態（已完成/處理中/已取消/已退款）\n\n' +
+    '請直接回傳 JSON 陣列格式，不要加任何說明文字，格式如下：\n' +
+    '[{"order_date":"2026-06-07","platform":"Discord Nitro","version":"加成3個月 - 2次","qty":1,"unit_price":320,"buyer":"No.3492787","status":"已完成"}]';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  })
+  .then(function(res) {
+    if (!res.ok) {
+      return res.json().then(function(err) {
+        throw new Error(err.error ? err.error.message : 'API 錯誤 ' + res.status);
+      });
+    }
+    return res.json();
+  })
+  .then(function(data) {
+    var text = data.content[0].text.trim();
+    // Extract JSON from response (might be wrapped in code blocks)
+    var jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('無法解析回應');
+    ocrParsedOrders = JSON.parse(jsonMatch[0]);
+    showOcrResults();
+  })
+  .catch(function(err) {
+    $('ocrStatus').style.display = 'none';
+    toast('辨識失敗：' + err.message, 'err');
+  });
+}
+
+function showOcrResults() {
+  $('ocrStatus').style.display = 'none';
+  $('ocrResults').style.display = '';
+  $('btnOcrImport').style.display = '';
+
+  var total = 0, count = ocrParsedOrders.length;
+  var html = '';
+  ocrParsedOrders.forEach(function(o, i) {
+    var price = Number(o.unit_price) || 0;
+    var qty = Number(o.qty) || 1;
+    total += price * qty;
+
+    // Try to match product cost from existing products
+    var matchedCost = matchProductCost(o.platform, o.version);
+
+    html += '<div class="ocr-order-card">' +
+      '<div class="ocr-row"><span class="ocr-label">商品</span><span class="ocr-val">' + esc(o.platform) + '</span></div>' +
+      '<div class="ocr-row"><span class="ocr-label">品項</span><span class="ocr-val">' + esc(o.version || '') + '</span></div>' +
+      '<div class="ocr-row"><span class="ocr-label">日期</span><span class="ocr-val">' + esc(o.order_date || '') + '</span></div>' +
+      '<div class="ocr-row"><span class="ocr-label">售價</span><span class="ocr-price">$' + fmtN(price) + (qty > 1 ? ' x' + qty : '') + '</span></div>' +
+      '<div class="ocr-row"><span class="ocr-label">成本</span><input class="ocr-cost-input" id="ocrCost' + i + '" type="number" min="0" value="' + (matchedCost || '') + '" placeholder="輸入成本"></div>' +
+      '<div class="ocr-row"><span class="ocr-label">買家</span><span class="ocr-val" style="color:var(--fg2)">' + esc(o.buyer || '') + '</span></div>' +
+      '</div>';
+  });
+  $('ocrOrderList').innerHTML = html;
+  $('ocrSummary').innerHTML =
+    '<div class="sum-item"><div class="sum-label">訂單數</div><div class="sum-val">' + count + ' 筆</div></div>' +
+    '<div class="sum-item"><div class="sum-label">總售價</div><div class="sum-val">NT$' + fmtN(total) + '</div></div>';
+}
+
+function matchProductCost(platform, version) {
+  // Try to find matching product in database for auto-fill cost
+  var match = null;
+  products.forEach(function(p) {
+    if (!match && p.status === '啟用') {
+      var pName = (p.platform || '').toLowerCase();
+      var oName = (platform || '').toLowerCase();
+      if (oName.indexOf(pName) >= 0 || pName.indexOf(oName) >= 0) {
+        // Platform matches, check version if possible
+        if (version && p.version) {
+          var pVer = p.version.toLowerCase();
+          var oVer = version.toLowerCase();
+          if (oVer.indexOf(pVer) >= 0 || pVer.indexOf(oVer) >= 0) {
+            match = p;
+          }
+        }
+        if (!match) match = p; // fallback to platform-only match
+      }
+    }
+  });
+  return match ? match.cost : 0;
+}
+
+function importOcrOrders() {
+  if (ocrParsedOrders.length === 0) return;
+  $('btnOcrImport').disabled = true;
+  $('btnOcrImport').textContent = '匯入中...';
+
+  var rows = ocrParsedOrders.map(function(o, i) {
+    var d = o.order_date || today();
+    var costInput = $('ocrCost' + i);
+    var cost = costInput ? Number(costInput.value) || 0 : 0;
+    return {
+      user_id: userId,
+      order_date: d,
+      order_no: d.replace(/-/g, '') + '-' + String(i + 1).padStart(2, '0'),
+      channel: '8591',
+      status: o.status || '已完成',
+      platform: o.platform || '',
+      version: o.version || '',
+      duration: '',
+      qty: Number(o.qty) || 1,
+      unit_price: Number(o.unit_price) || 0,
+      unit_cost: cost,
+      fee_type: '百分比',
+      fee_value: PLATFORM_FEE,
+      commission_type: '百分比',
+      commission_value: 0,
+      notes: '截圖匯入' + (o.buyer ? ' | 買家' + o.buyer : '')
+    };
+  });
+
+  if (isDemo) {
+    rows.forEach(function(r) { r.id = 'd' + Date.now() + Math.random(); orders.unshift(r) });
+    demoSave(); closeModal(); renderAll();
+    toast('成功匯入 ' + rows.length + ' 筆訂單', 'ok');
+    return;
+  }
+
+  sb.from('orders').insert(rows).then(function(res) {
+    if (res.error) {
+      toast('匯入失敗：' + res.error.message, 'err');
+      $('btnOcrImport').disabled = false;
+      $('btnOcrImport').textContent = '匯入全部';
+      return;
+    }
+    closeModal(); loadAll();
+    toast('成功匯入 ' + rows.length + ' 筆訂單！', 'ok');
+  });
+}
+
 /* ──── Utils ──── */
 function esc(s) {
   if (!s) return '';

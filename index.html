@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -52,6 +52,7 @@
       <span id="userLabel" class="user-label"></span>
       <button class="icon-btn" onclick="doRefresh()" title="重新整理">⟳</button>
       <button class="icon-btn" onclick="toggleTheme()" title="切換主題">◐</button>
+      <button class="icon-btn" onclick="openSettings()" title="設定">⚙</button>
       <button class="icon-btn" onclick="doLogout()" title="登出">⏻</button>
     </div>
   </header>
@@ -88,6 +89,7 @@
   <section id="tab-orders" class="tab-content">
     <div class="toolbar">
       <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
+      <button class="btn accent" onclick="openOcrModal()">📷 截圖匯入</button>
       <div class="search-group">
         <input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()">
         <select id="orderChannelFilter" onchange="renderOrders()">
@@ -303,7 +305,59 @@
   </div>
 </div>
 
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal modal-sm">
+  <div class="modal-head">
+    <h3>設定</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label>Anthropic API Key（截圖辨識用）</label>
+      <input id="set_apiKey" type="password" placeholder="sk-ant-...">
+      <p class="hint">到 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得，儲存在本機</p>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn primary" onclick="saveSettings()">儲存</button>
+  </div>
+</div>
+
+<!-- OCR Import Modal -->
+<div id="ocrModal" class="modal modal-lg">
+  <div class="modal-head">
+    <h3>📷 截圖匯入訂單</h3>
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <div id="ocrUploadArea" class="ocr-upload">
+      <div class="ocr-placeholder" id="ocrPlaceholder">
+        <div class="icon">📷</div>
+        <p>點擊上傳截圖，或拖拽圖片到此處</p>
+        <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單</p>
+        <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
+      </div>
+      <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
+    </div>
+    <div id="ocrStatus" style="display:none" class="ocr-status">
+      <div class="spinner"></div>
+      <span>AI 辨識中，請稍候...</span>
+    </div>
+    <div id="ocrResults" style="display:none">
+      <h4 style="margin-bottom:8px">辨識結果（確認後匯入）</h4>
+      <div id="ocrOrderList"></div>
+      <div class="ocr-summary" id="ocrSummary"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn ghost" id="btnOcrRetry" style="display:none" onclick="resetOcr()">重新上傳</button>
+    <button class="btn primary" id="btnOcrImport" style="display:none" onclick="importOcrOrders()">匯入全部</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
