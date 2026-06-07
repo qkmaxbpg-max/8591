@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:360px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f1117;color:#e2e4f0;padding:16px;font-size:13px}
+h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.status{padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:12px}
+.status.ok{background:rgba(52,211,153,.12);color:#34d399}
+.status.err{background:rgba(248,113,113,.12);color:#f87171}
+.status.info{background:rgba(108,140,255,.12);color:#6c8cff}
+
+.section{background:#1e2030;border-radius:8px;padding:12px;margin-bottom:10px}
+.section h3{font-size:13px;color:#8890a8;margin-bottom:8px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px}
+.row .label{color:#8890a8}
+.row .val{color:#e2e4f0;font-weight:600}
+
+.order-item{background:#262940;border-radius:6px;padding:10px;margin-bottom:6px;font-size:12px}
+.order-item .name{font-weight:600;color:#e2e4f0;margin-bottom:4px}
+.order-item .meta{color:#8890a8}
+.order-item .price{color:#34d399;font-weight:600}
+
+.btn{width:100%;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px;transition:all .2s}
+.btn.primary{background:#6c8cff;color:#fff}
+.btn.primary:hover{background:#4a6adf}
+.btn.primary:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:#8890a8;border:1px solid #363a54}
+.btn.ghost:hover{background:#1e2030}
+
+.empty{text-align:center;padding:20px;color:#5a6080}
+.empty .icon{font-size:32px;margin-bottom:8px}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge.ok{background:rgba(52,211,153,.15);color:#34d399}
+.badge.pending{background:rgba(108,140,255,.15);color:#6c8cff}
+
+#orderList{max-height:280px;overflow-y:auto;scrollbar-width:thin}
+#orderList::-webkit-scrollbar{width:4px}
+#orderList::-webkit-scrollbar-thumb{background:#363a54;border-radius:2px}
+
+.footer{text-align:center;color:#5a6080;font-size:11px;margin-top:8px}
+.footer a{color:#6c8cff;text-decoration:none}
+</style>
+</head>
+<body>
+
+<h2>📦 8591 訂單匯入</h2>
+
+<div id="statusBar" class="status info">等待掃描 8591 頁面...</div>
+
+<div id="scanSection">
+  <button id="btnScan" class="btn primary">🔍 掃描當前頁面訂單</button>
+  <button id="btnScanAll" class="btn ghost">掃描全部頁面（多頁）</button>
+</div>
+
+<div id="resultSection" style="display:none">
+  <div class="section">
+    <h3>掃描結果</h3>
+    <div class="row"><span class="label">找到訂單</span><span id="orderCount" class="val">0</span></div>
+    <div class="row"><span class="label">總金額</span><span id="totalAmount" class="val">NT$0</span></div>
+  </div>
+
+  <div id="orderList"></div>
+
+  <button id="btnImport" class="btn primary">📥 匯入到代儲管理系統</button>
+  <button id="btnClear" class="btn ghost">清除結果</button>
+</div>
+
+<div class="footer">
+  <a href="https://qkmaxbpg-max.github.io/8591/" target="_blank">開啟代儲管理系統</a>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
