@@ -70,7 +70,7 @@ create table if not exists orders (
 );
 
 -- 廣告支出
-create table if not exists ads (
+create table if not exists ad_spends (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id) on delete cascade not null,
   ad_date date not null default current_date,
@@ -85,7 +85,7 @@ alter table products enable row level security;
 alter table agents enable row level security;
 alter table customers enable row level security;
 alter table orders enable row level security;
-alter table ads enable row level security;
+alter table ad_spends enable row level security;
 
 create policy "Users manage own products" on products
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -95,11 +95,11 @@ create policy "Users manage own customers" on customers
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users manage own orders" on orders
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Users manage own ads" on ads
+create policy "Users manage own ads" on ad_spends
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Indexes
 create index if not exists idx_orders_user_date on orders(user_id, order_date desc);
 create index if not exists idx_orders_status on orders(user_id, status);
 create index if not exists idx_products_user on products(user_id, status);
-create index if not exists idx_ads_user_date on ads(user_id, ad_date desc);
+create index if not exists idx_ad_spends_user_date on ad_spends(user_id, ad_date desc);

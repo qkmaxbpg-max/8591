@@ -129,7 +129,7 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ads').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
   ]).then(function(res) {
     products = res[0].data || [];
     agents = res[1].data || [];
@@ -1158,8 +1158,8 @@ function saveAd() {
   } else {
     obj.user_id = userId;
     var req = id
-      ? sb.from('ads').update(obj).eq('id', id)
-      : sb.from('ads').insert(obj);
+      ? sb.from('ad_spends').update(obj).eq('id', id)
+      : sb.from('ad_spends').insert(obj);
     req.then(function(res) {
       if (res.error) return toast(res.error.message, 'err');
       closeModal(); loadAll(); toast('廣告記錄已儲存', 'ok');
@@ -1172,7 +1172,7 @@ function deleteAd(id) {
       ads = ads.filter(function(a) { return a.id !== id });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
-      sb.from('ads').delete().eq('id', id).then(function(res) {
+      sb.from('ad_spends').delete().eq('id', id).then(function(res) {
         if (res.error) return toast(res.error.message, 'err');
         loadAll(); toast('已刪除', 'ok');
       });
