@@ -1379,6 +1379,9 @@ function callTesseractOCR(file) {
     }
   }).then(function(result) {
     var text = result.data.text;
+    console.log('===== OCR 原始文字 =====');
+    console.log(text);
+    console.log('========================');
     ocrParsedOrders = parseOcrText(text);
     if (ocrParsedOrders.length === 0) {
       $('ocrStatus').style.display = 'none';
@@ -1423,8 +1426,23 @@ function parseOcrText(text) {
 }
 
 function parseOcrBlock(block) {
-  // Date: 下單時間：YYYY-MM-DD or just YYYY-MM-DD or YYYY/MM/DD
-  var dateMatch = block.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+  /*  8591 fixed format (each order block):
+      Line 1: 買家：No.3492787   商品編號：s2249844473   下單時間：2026-06-07 19:41:54
+      Line 2: [代儲] 🐾貓玩聚代儲◆Discord Nitro◆最低$160起🌟   x1   $320   已完成
+      Line 3: Discord Nitro/其他
+      Line 4: 品項：◆ 加成3個月 - 2次*1
+
+      KEY: the title contains "$160起" (starting-price), the REAL selling price is "$320" (standalone).
+      Tesseract may put x1 and $320 on separate lines, so we can NOT rely on "x1 $320" adjacency.
+      Strategy: find all $NNN, exclude any followed by "起", keep the rest.
+  */
+
+  console.log('--- parseOcrBlock input ---');
+  console.log(block);
+
+  // 1. Date
+  var dateMatch = block.match(/下單時間[：:]\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (!dateMatch) dateMatch = block.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   var orderDate = '';
   if (dateMatch) {
     var mm = dateMatch[2].length < 2 ? '0' + dateMatch[2] : dateMatch[2];
@@ -1432,62 +1450,93 @@ function parseOcrBlock(block) {
     orderDate = dateMatch[1] + '-' + mm + '-' + dd;
   }
 
-  // Price: $NNN or $N,NNN
-  var priceMatch = block.match(/\$\s*([\d,]+)/);
-  var price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
-
-  // Quantity: xN or x N
+  // 2. Quantity
   var qtyMatch = block.match(/x\s*(\d+)/i);
   var qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
 
-  // Buyer: No.NNNNNNN
-  var buyerMatch = block.match(/No\.\s*(\d+)/);
+  // 3. Selling price — find ALL "$NNN" then exclude title prices
+  var price = 0;
+  var allPrices = [];
+  var priceRe = /\$\s*([\d,]+)/g;
+  var pm;
+  while ((pm = priceRe.exec(block)) !== null) {
+    var val = parseInt(pm[1].replace(/,/g, '')) || 0;
+    if (!val) continue;
+    // Check if this price is a title price: followed by "起" within 3 chars
+    var afterPrice = block.substring(pm.index + pm[0].length, pm.index + pm[0].length + 3);
+    var isTitle = /起/.test(afterPrice);
+    // Also check: preceded by "最低" or "低" within 10 chars
+    var beforePrice = block.substring(Math.max(0, pm.index - 10), pm.index);
+    if (/最低|低/.test(beforePrice)) isTitle = true;
+    allPrices.push({ val: val, idx: pm.index, isTitle: isTitle });
+  }
+  console.log('All $prices found:', JSON.stringify(allPrices));
+  // Filter out title prices
+  var realPrices = allPrices.filter(function(p) { return !p.isTitle; });
+  if (realPrices.length > 0) {
+    price = realPrices[0].val;  // first non-title price = selling price
+  } else if (allPrices.length > 0) {
+    // All prices look like title prices? Take the last one as fallback
+    price = allPrices[allPrices.length - 1].val;
+  }
+
+  // 4. Buyer
+  var buyerMatch = block.match(/買家[：:]\s*No\.?\s*(\d+)/);
+  if (!buyerMatch) buyerMatch = block.match(/No\.?\s*(\d{5,})/);
   var buyer = buyerMatch ? 'No.' + buyerMatch[1] : '';
 
-  // Platform: known product names
+  // 5. Platform
   var platform = '';
-  var knownProducts = [
-    'Discord Nitro', 'YouTube Premium', 'YouTube Music', 'Netflix',
-    'Spotify', 'Nintendo', 'PlayStation', 'Xbox Game Pass', 'EA Play',
-    'Apple Music', 'Google One', 'Canva', 'ChatGPT', 'Claude',
-    'Adobe', 'Microsoft 365', 'Office 365', 'Disney', 'HBO',
-    'Crunchyroll', 'Steam'
-  ];
-  var blockLower = block.toLowerCase();
-  for (var i = 0; i < knownProducts.length; i++) {
-    if (blockLower.indexOf(knownProducts[i].toLowerCase()) >= 0) {
-      platform = knownProducts[i];
-      break;
+  // Try "Product/Category" line pattern (e.g. "Discord Nitro/其他")
+  var lines = block.split(/\n/);
+  for (var li = 0; li < lines.length; li++) {
+    var catMatch = lines[li].match(/^\s*([A-Za-z][A-Za-z\s]*(?:Nitro|Premium|Music|Plus|Pro|Basic|Standard|Family|Pass)?)\s*[\/／]/);
+    if (catMatch) { platform = catMatch[1].trim(); break; }
+  }
+  // Fallback: known products
+  if (!platform) {
+    var knownProducts = [
+      'Discord Nitro', 'YouTube Premium', 'YouTube Music', 'Netflix',
+      'Spotify Premium', 'Spotify', 'Nintendo Switch Online', 'Nintendo',
+      'PlayStation Plus', 'PlayStation', 'Xbox Game Pass', 'EA Play',
+      'Apple Music', 'Apple TV', 'Google One', 'Canva Pro', 'Canva',
+      'ChatGPT Plus', 'ChatGPT', 'Claude Pro', 'Adobe',
+      'Microsoft 365', 'Office 365', 'Disney+', 'Disney', 'HBO',
+      'Crunchyroll', 'Steam'
+    ];
+    var blockLower = block.toLowerCase();
+    for (var i = 0; i < knownProducts.length; i++) {
+      if (blockLower.indexOf(knownProducts[i].toLowerCase()) >= 0) {
+        platform = knownProducts[i]; break;
+      }
     }
   }
-  // Also try extracting from "Category/SubType" pattern
-  if (!platform) {
-    var catMatch = block.match(/([A-Za-z][A-Za-z\s]+(?:Nitro|Premium|Music|Plus|Pro|Basic)?)\s*[\/\\]/);
-    if (catMatch) platform = catMatch[1].trim();
-  }
 
-  // Version/Item: 品項：details
+  // 6. 品項 (version/item details)
   var version = '';
-  var itemMatch = block.match(/品項[：:]*\s*(.+)/);
+  // Try exact match first
+  var itemMatch = block.match(/品項[：:﹕]\s*(.+)/);
+  if (!itemMatch) {
+    // OCR may read 品項 with slight variations
+    itemMatch = block.match(/品[項项][：:﹕]?\s*(.+)/);
+  }
   if (itemMatch) {
     version = itemMatch[1].trim()
-      .replace(/^[◆☆★●○▶►▪▸※\s]+/, '')
-      .replace(/\*\s*\d+$/, '')
-      .replace(/x\s*\d+$/i, '')
+      .replace(/^[◆☆★●○▶►▪▸※\-\s]+/, '')  // remove leading symbols
+      .replace(/\s*(評價|自助退款|查看訂單|已評價|評價買家).*$/g, '')  // remove trailing UI text
       .trim();
   }
+  console.log('品項 extracted:', version);
 
-  // Status
+  // 7. Status
   var status = '已完成';
-  if (block.indexOf('已完成') >= 0 || block.indexOf('完成') >= 0) status = '已完成';
-  else if (block.indexOf('處理中') >= 0 || block.indexOf('交易中') >= 0) status = '處理中';
-  else if (block.indexOf('已取消') >= 0 || block.indexOf('取消') >= 0) status = '已取消';
-  else if (block.indexOf('已退款') >= 0 || block.indexOf('退款') >= 0) status = '已退款';
+  if (block.indexOf('處理中') >= 0 || block.indexOf('交易中') >= 0) status = '處理中';
+  else if (block.indexOf('已取消') >= 0) status = '已取消';
+  else if (block.indexOf('已退款') >= 0) status = '已退款';
 
-  // Must have at least price to be valid
   if (!price) return null;
 
-  return {
+  var result = {
     order_date: orderDate,
     platform: platform || '未分類',
     version: version,
@@ -1496,6 +1545,8 @@ function parseOcrBlock(block) {
     buyer: buyer,
     status: status
   };
+  console.log('parseOcrBlock result:', JSON.stringify(result));
+  return result;
 }
 
 /* ──── AI OCR: Claude Vision (optional, paid) ──── */
