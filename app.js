@@ -780,7 +780,7 @@ function openOrderModal(item) {
   $('om_qty').value = item ? item.qty : 1;
   $('om_unitPrice').value = item ? item.unit_price : '';
   $('om_unitCost').value = item ? item.unit_cost : '';
-  $('om_status').value = item ? item.status : '處理中';
+  $('om_status').value = item ? item.status : '已完成';
   dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
   $('om_notes').value = item ? (item.notes || '') : '';
   $('om_manualName').value = item ? (item.platform || '') : '';
