@@ -100,6 +100,20 @@ function enterApp(label) {
   mpInit('mpOrders', renderOrders);
   mpInit('mpAds', renderAds);
   loadAll();
+  // Share auth token with Chrome extension (if installed)
+  shareTokenWithExtension();
+}
+function shareTokenWithExtension() {
+  if (isDemo || !sb) return;
+  sb.auth.getSession().then(function(res) {
+    if (res.data && res.data.session) {
+      window.postMessage({
+        type: 'PROXY_AUTH',
+        token: res.data.session.access_token,
+        userId: res.data.session.user.id
+      }, '*');
+    }
+  });
 }
 function autoLogin() {
   initSb();

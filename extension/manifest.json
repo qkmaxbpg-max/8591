@@ -4,7 +4,7 @@
   "version": "1.0",
   "description": "從 8591 賣家後台一鍵匯入訂單到代儲管理系統",
   "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://www.8591.com.tw/*"],
+  "host_permissions": ["https://www.8591.com.tw/*", "https://qkmaxbpg-max.github.io/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -17,6 +17,10 @@
       "matches": ["https://www.8591.com.tw/*"],
       "js": ["content.js"],
       "css": ["content.css"]
+    },
+    {
+      "matches": ["https://qkmaxbpg-max.github.io/8591/*"],
+      "js": ["auth-bridge.js"]
     }
   ],
   "icons": {

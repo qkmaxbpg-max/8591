@@ -1,157 +1,144 @@
 /* 8591 Order Import - Content Script
-   Runs on 8591.com.tw pages to scrape order data.
-
-   NOTE: The selectors below are best-guess patterns.
-   After the user provides a screenshot of their seller backend,
-   the selectors should be fine-tuned to match the actual DOM.
+   Scans 8591 seller backend order pages.
+   Each order block structure:
+     買家：No.XXXXXXX   商品編號：sXXXXXXXXXX   下單時間：YYYY-MM-DD HH:MM:SS
+     [代儲] product title   xQTY   $PRICE   STATUS
+     Category/Type
+     品項：item details
 */
 
-// Listen for scan requests from popup
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.action === 'scan') {
     var orders = scanPage();
     sendResponse({ orders: orders });
   }
-  return true; // keep channel open for async
+  return true;
 });
 
 function scanPage() {
+  // Get the full page text and split into order blocks
+  // Each block starts with "買家：No."
+  var body = document.body.innerText;
+  var blocks = body.split(/(?=買家：No\.)/);
   var orders = [];
 
-  // Strategy 1: Try to find table rows (most seller backends use tables)
-  var tables = document.querySelectorAll('table');
-  tables.forEach(function(table) {
-    var rows = table.querySelectorAll('tbody tr, tr');
-    rows.forEach(function(tr) {
-      var cells = tr.querySelectorAll('td');
-      if (cells.length < 3) return; // skip header or tiny rows
-      var order = parseTableRow(cells);
-      if (order) orders.push(order);
-    });
+  blocks.forEach(function(block) {
+    if (block.indexOf('買家：No.') !== 0) return;
+    var o = parseOrderBlock(block);
+    if (o) orders.push(o);
   });
 
-  // Strategy 2: Try common card/list layouts
+  // Fallback: try DOM-based approach
   if (orders.length === 0) {
-    var items = document.querySelectorAll('[class*="order"], [class*="trade"], [class*="record"], [class*="item-list"]');
-    items.forEach(function(el) {
-      var order = parseCardItem(el);
-      if (order) orders.push(order);
-    });
-  }
-
-  // Strategy 3: Look for specific 8591 patterns
-  if (orders.length === 0) {
-    // 8591 trade list items
-    var listItems = document.querySelectorAll('.trade-list .item, .order-list .item, .dataList .item, li[class*="item"]');
-    listItems.forEach(function(el) {
-      var order = parseCardItem(el);
-      if (order) orders.push(order);
-    });
+    orders = scanDOM();
   }
 
   return orders;
 }
 
-function parseTableRow(cells) {
-  // Try to extract order data from table cells
-  var texts = [];
-  for (var i = 0; i < cells.length; i++) {
-    texts.push(cells[i].textContent.trim());
-  }
-  var combined = texts.join(' ');
+function parseOrderBlock(block) {
+  var lines = block.split('\n').map(function(l) { return l.trim() }).filter(function(l) { return l.length > 0 });
 
-  // Must contain some price-like text (NT$ or numbers)
-  var priceMatch = combined.match(/(?:NT\$?\s*|元\s*)([\d,]+)/);
-  if (!priceMatch && !combined.match(/\d{3,}/)) return null;
+  // 1. Extract date: 下單時間：YYYY-MM-DD HH:MM:SS
+  var dateMatch = block.match(/下單時間[：:]\s*(\d{4}-\d{2}-\d{2})/);
+  var orderDate = dateMatch ? dateMatch[1] : '';
 
-  // Try to find date
-  var dateMatch = combined.match(/(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+  // 2. Extract buyer: 買家：No.XXXXXXX
+  var buyerMatch = block.match(/買家[：:]\s*No\.(\d+)/);
+  var buyer = buyerMatch ? 'No.' + buyerMatch[1] : '';
 
-  // Try to find product name (look for known keywords)
-  var platform = '';
-  var knownPlatforms = ['YouTube', 'Netflix', 'Spotify', 'Discord', 'Nintendo', 'PlayStation', 'Xbox',
-    'Steam', 'Apple', 'Google Play', 'Premium', 'Nitro', 'Game Pass', 'EA Play'];
-  knownPlatforms.forEach(function(kw) {
-    if (combined.toLowerCase().indexOf(kw.toLowerCase()) >= 0) platform = kw;
-  });
-  if (!platform) {
-    // Use the longest text cell as product name
-    var longest = '';
-    texts.forEach(function(t) {
-      if (t.length > longest.length && t.length < 100 && !/^\d+$/.test(t)) longest = t;
-    });
-    platform = longest;
+  // 3. Extract price: $NNN (the selling price, usually colored/highlighted)
+  var priceMatch = block.match(/\$\s*([\d,]+)/);
+  var price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
+
+  // 4. Extract quantity: xN
+  var qtyMatch = block.match(/x(\d+)/);
+  var qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+
+  // 5. Extract category: "Discord Nitro/其他", "YouTube Premium/其他" etc.
+  //    Pattern: ProductName/SubCategory on its own line
+  var platform = '', version = '';
+  var catMatch = block.match(/^([A-Za-z\s一-鿿]+(?:Premium|Nitro|Basic|Standard|Family|Plus|Pro)?[A-Za-z\s]*)\/([一-鿿\w]+)/m);
+  if (catMatch) {
+    platform = catMatch[1].trim();
   }
 
-  var price = 0;
-  if (priceMatch) {
-    price = parseInt(priceMatch[1].replace(/,/g, '')) || 0;
-  } else {
-    // find largest number
-    var nums = combined.match(/[\d,]+/g) || [];
-    nums.forEach(function(n) {
-      var v = parseInt(n.replace(/,/g, '')) || 0;
-      if (v > price && v < 100000) price = v;
-    });
+  // 6. Extract item details: 品項：details
+  var itemMatch = block.match(/品項[：:]\s*(.+)/);
+  if (itemMatch) {
+    version = itemMatch[1].trim()
+      .replace(/^[◆☆★●○▶►▪▸\s]+/, '') // remove leading symbols
+      .replace(/\*\d+$/, '')            // remove trailing *1, *2
+      .replace(/x\s*\d+$/, '')          // remove trailing x1, x2
+      .trim();
   }
 
-  if (!platform && !price) return null;
+  // 7. Extract status
+  var status = '已完成';
+  if (block.indexOf('已完成') >= 0) status = '已完成';
+  else if (block.indexOf('交易中') >= 0 || block.indexOf('處理中') >= 0) status = '處理中';
+  else if (block.indexOf('已取消') >= 0) status = '已取消';
+  else if (block.indexOf('已退款') >= 0) status = '已退款';
+
+  // Must have at least price or platform
+  if (!price && !platform) return null;
 
   return {
-    order_date: dateMatch ? dateMatch[1].replace(/\//g, '-') : '',
-    platform: platform.slice(0, 50),
-    version: '',
+    order_date: orderDate,
+    platform: platform || '未分類',
+    version: version,
     duration: '',
-    qty: 1,
+    qty: qty,
     unit_price: price,
     unit_cost: 0,
-    buyer: ''
+    buyer: buyer,
+    status: status
   };
 }
 
-function parseCardItem(el) {
-  var text = el.textContent.trim();
-  if (text.length < 5 || text.length > 2000) return null;
+/* DOM-based fallback: try finding order elements by structure */
+function scanDOM() {
+  var orders = [];
 
-  var priceMatch = text.match(/(?:NT\$?\s*|金額[：:]\s*|售價[：:]\s*)([\d,]+)/);
-  var dateMatch = text.match(/(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
-  var buyerMatch = text.match(/買家[：:]\s*(\S+)/);
+  // Try common 8591 container patterns
+  var containers = document.querySelectorAll(
+    '[class*="order"], [class*="trade"], [class*="record"], ' +
+    '[class*="list-item"], [class*="dataList"], ' +
+    'table tbody tr, .item-box, .order-box'
+  );
 
-  if (!priceMatch) return null;
+  containers.forEach(function(el) {
+    var text = el.innerText || '';
+    if (text.indexOf('買家') < 0 && text.indexOf('下單時間') < 0) return;
+    var o = parseOrderBlock(text);
+    if (o) orders.push(o);
+  });
 
-  // Extract product name
-  var nameEl = el.querySelector('[class*="name"], [class*="title"], h3, h4, .item-name, .prod-name');
-  var platform = nameEl ? nameEl.textContent.trim() : '';
-  if (!platform) {
-    // Take first meaningful line
-    var lines = text.split('\n').map(function(l) { return l.trim() }).filter(function(l) { return l.length > 2 && l.length < 80 });
-    platform = lines[0] || '';
-  }
-
-  return {
-    order_date: dateMatch ? dateMatch[1].replace(/\//g, '-') : '',
-    platform: platform.slice(0, 50),
-    version: '',
-    duration: '',
-    qty: 1,
-    unit_price: parseInt(priceMatch[1].replace(/,/g, '')) || 0,
-    unit_cost: 0,
-    buyer: buyerMatch ? buyerMatch[1] : ''
-  };
+  return orders;
 }
 
-// Add floating import button on 8591 pages
+/* Floating button on 8591 seller pages */
 (function() {
-  // Only show on pages that might have orders
-  var path = window.location.pathname;
-  if (path.indexOf('dashboard') >= 0 || path.indexOf('trade') >= 0 ||
-      path.indexOf('order') >= 0 || path.indexOf('sell') >= 0 ||
-      path.indexOf('record') >= 0 || path.indexOf('history') >= 0) {
+  // Show on any 8591 page that might contain orders
+  if (document.body.innerText.indexOf('買家：No.') >= 0 ||
+      window.location.href.indexOf('dashboard') >= 0 ||
+      window.location.href.indexOf('trade') >= 0 ||
+      window.location.href.indexOf('order') >= 0 ||
+      window.location.href.indexOf('record') >= 0) {
     addFloatingButton();
   }
+
+  // Also watch for dynamic content loading (SPA)
+  var observer = new MutationObserver(function() {
+    if (document.body.innerText.indexOf('買家：No.') >= 0 && !document.getElementById('proxy-import-btn')) {
+      addFloatingButton();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
 
 function addFloatingButton() {
+  if (document.getElementById('proxy-import-btn')) return;
   var btn = document.createElement('div');
   btn.id = 'proxy-import-btn';
   btn.innerHTML = '📦 匯入訂單';
@@ -164,20 +151,19 @@ function addFloatingButton() {
       showNotice('此頁面沒有找到訂單資料', 'err');
       return;
     }
-    showNotice('找到 ' + orders.length + ' 筆訂單！請點擊擴充套件圖示匯入', 'ok');
-    // Store for popup to use
+    // Store scanned orders for popup
     chrome.storage.local.set({ scannedOrders: orders });
+    showNotice('找到 ' + orders.length + ' 筆訂單！點擊右上角擴充圖示查看', 'ok');
   });
 }
 
 function showNotice(msg, type) {
   var existing = document.getElementById('proxy-notice');
   if (existing) existing.remove();
-
   var div = document.createElement('div');
   div.id = 'proxy-notice';
   div.className = 'proxy-notice ' + type;
   div.textContent = msg;
   document.body.appendChild(div);
-  setTimeout(function() { div.remove() }, 3000);
+  setTimeout(function() { div.remove() }, 3500);
 }
