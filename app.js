@@ -321,7 +321,7 @@ function dpPanel(id) {
   var s = dpState[id];
   var y = s.viewYear, m = s.viewMonth;
   var todayStr = today();
-  var h = '<div class="dp-panel" onclick="event.stopPropagation()">' +
+  var h = '<div class="dp-panel">' +
     '<div class="dp-head"><button data-dp-shift="' + id + ',-1">‹</button>' +
     '<span>' + y + '/' + (m + 1 < 10 ? '0' : '') + (m + 1) + '</span>' +
     '<button data-dp-shift="' + id + ',1">›</button></div>' +
@@ -405,10 +405,12 @@ document.addEventListener('click', function(e) {
     dpState[id].onChange(id, val);
     return;
   }
-  // Close all open date pickers on outside click
-  Object.keys(dpState).forEach(function(id) {
-    if (dpState[id].open) { dpState[id].open = false; dpRender(id) }
-  });
+  // Close all open date pickers on outside click (but not when clicking inside a panel)
+  if (!e.target.closest('.dp-panel')) {
+    Object.keys(dpState).forEach(function(id) {
+      if (dpState[id].open) { dpState[id].open = false; dpRender(id) }
+    });
+  }
 });
 
 /* ──── Dashboard ──── */
