@@ -1303,6 +1303,24 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Paste image (Ctrl+V)
+document.addEventListener('paste', function(e) {
+  // Only handle when import modal is open
+  if (!$('importModal').classList.contains('show')) return;
+  var items = (e.clipboardData || {}).items || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') >= 0) {
+      e.preventDefault();
+      var file = items[i].getAsFile();
+      if (file) {
+        switchImportTab('screenshot');
+        handleOcrFile(file);
+      }
+      return;
+    }
+  }
+});
+
 // Drag & drop
 document.addEventListener('dragover', function(e) {
   var area = e.target.closest('#ocrUploadArea');

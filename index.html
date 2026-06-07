@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 
@@ -356,8 +356,8 @@
       <div id="ocrUploadArea" class="ocr-upload">
         <div class="ocr-placeholder" id="ocrPlaceholder">
           <div class="icon">📷</div>
-          <p>點擊上傳截圖，或拖拽圖片到此處</p>
-          <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單</p>
+          <p>Ctrl+V 貼上截圖、拖拽、或點擊上傳</p>
+          <p class="sub">截圖後直接 Ctrl+V 最快！支援多筆訂單</p>
           <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
         </div>
         <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
@@ -384,6 +384,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>
