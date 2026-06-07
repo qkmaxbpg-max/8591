@@ -5,6 +5,29 @@ var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var sb = null, userId = null, isDemo = false;
 var products = [], agents = [], customers = [], orders = [], ads = [];
 
+/* 個人管道預設商品 */
+var PERSONAL_PRESETS_DEFAULT = ['原神','崩鐵','鳴潮','絕區零','傳說','抖音','代付'];
+function getPersonalPresets() {
+  var custom = JSON.parse(localStorage.getItem('proxy-personal-presets') || '[]');
+  var all = PERSONAL_PRESETS_DEFAULT.concat(custom);
+  // dedupe
+  var seen = {}, out = [];
+  all.forEach(function(x) { if (!seen[x]) { seen[x] = 1; out.push(x) } });
+  return out;
+}
+function addPersonalPreset(name) {
+  if (!name) return;
+  var custom = JSON.parse(localStorage.getItem('proxy-personal-presets') || '[]');
+  if (PERSONAL_PRESETS_DEFAULT.indexOf(name) >= 0 || custom.indexOf(name) >= 0) return;
+  custom.push(name);
+  localStorage.setItem('proxy-personal-presets', JSON.stringify(custom));
+}
+function removePersonalPreset(name) {
+  var custom = JSON.parse(localStorage.getItem('proxy-personal-presets') || '[]');
+  custom = custom.filter(function(x) { return x !== name });
+  localStorage.setItem('proxy-personal-presets', JSON.stringify(custom));
+}
+
 function $(id) { return document.getElementById(id) }
 function fmtN(n) { return Number(n || 0).toLocaleString('zh-TW', { maximumFractionDigits: 0 }) }
 function fmtP(n) { return (Number(n || 0) * 100).toFixed(1) + '%' }
@@ -692,7 +715,40 @@ function onChannelChange() {
   var isPersonal = ch === '個人';
   $('om_manualGroup').style.display = isPersonal ? '' : 'none';
   $('om_productGroup').style.display = '';
+  if (isPersonal) renderPersonalPresets();
   calcOrderPreview();
+}
+function renderPersonalPresets() {
+  var presets = getPersonalPresets();
+  // datalist
+  var dlHtml = '';
+  presets.forEach(function(p) { dlHtml += '<option value="' + esc(p) + '">' });
+  $('personalPresetList').innerHTML = dlHtml;
+  // tags
+  var custom = JSON.parse(localStorage.getItem('proxy-personal-presets') || '[]');
+  var html = '';
+  presets.forEach(function(p) {
+    var isCustom = custom.indexOf(p) >= 0;
+    var isActive = $('om_manualName').value === p;
+    html += '<button type="button" class="preset-tag' + (isActive ? ' active' : '') + '" data-action="pickPreset" data-id="' + esc(p) + '">' + esc(p) +
+      (isCustom ? '<span class="preset-del" data-action="delPreset" data-id="' + esc(p) + '">✕</span>' : '') +
+      '</button>';
+  });
+  $('personalPresetTags').innerHTML = html;
+}
+function pickPreset(name) {
+  $('om_manualName').value = name;
+  // Clear product dropdown since using manual name
+  $('om_product').value = '';
+  renderPersonalPresets();
+  calcOrderPreview();
+}
+function addPresetFromInput() {
+  var name = $('om_manualName').value.trim();
+  if (!name) return toast('請先輸入商品名稱', 'err');
+  addPersonalPreset(name);
+  renderPersonalPresets();
+  toast(name + ' 已加入常用清單', 'ok');
 }
 function openOrderModal(item) {
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
@@ -821,6 +877,8 @@ function saveOrder() {
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
+  // Auto-remember personal channel product names
+  if (ch === '個人' && manualName && !pid) addPersonalPreset(manualName);
 
   var id = $('om_id').value;
   if (id) obj.order_no = orders.filter(function(o) { return o.id === id })[0].order_no;
@@ -1146,6 +1204,14 @@ document.addEventListener('click', function(e) {
     case 'deleteCustomer': deleteCustomer(id); break;
     case 'editAd': editAd(id); break;
     case 'deleteAd': deleteAd(id); break;
+    case 'pickPreset': pickPreset(id); break;
+    case 'delPreset':
+      e.stopPropagation();
+      removePersonalPreset(id);
+      if ($('om_manualName').value === id) $('om_manualName').value = '';
+      renderPersonalPresets();
+      toast(id + ' 已移除', 'ok');
+      break;
   }
 });
 

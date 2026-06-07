@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -200,7 +200,15 @@
       <select id="om_product" onchange="onProductSelect()"><option value="">— 選擇商品 —</option></select>
     </div>
     <div id="om_manualGroup" style="display:none">
-      <div class="form-group"><label>商品名稱</label><input id="om_manualName" placeholder="手動輸入商品名稱"></div>
+      <div class="form-group">
+        <label>商品名稱</label>
+        <div class="personal-preset-wrap">
+          <input id="om_manualName" list="personalPresetList" placeholder="選擇或輸入商品名稱" autocomplete="off">
+          <datalist id="personalPresetList"></datalist>
+          <button type="button" class="btn sm ghost" onclick="addPresetFromInput()" title="加入常用清單">＋常用</button>
+        </div>
+      </div>
+      <div id="personalPresetTags" class="preset-tags"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>數量</label><input id="om_qty" type="number" min="1" value="1" oninput="calcOrderPreview()"></div>
@@ -295,6 +303,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
