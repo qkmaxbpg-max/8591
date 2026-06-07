@@ -227,14 +227,3 @@ tr:hover td{background:var(--bg2)}
   td,th{padding:6px 8px}
 }
 
-/* Personal Preset Tags */
-.personal-preset-wrap{display:flex;gap:8px;align-items:center}
-.personal-preset-wrap input{flex:1}
-.personal-preset-wrap .btn{white-space:nowrap;flex-shrink:0;font-size:.75rem;padding:6px 10px}
-.preset-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:0 2px}
-.preset-tag{display:inline-flex;align-items:center;gap:4px;padding:5px 14px;border-radius:20px;background:var(--bg3);color:var(--fg1);border:1.5px solid var(--bg4);font-size:.82rem;cursor:pointer;transition:var(--transition);user-select:none}
-.preset-tag:hover{background:var(--accent-dim);border-color:var(--accent);color:var(--fg0)}
-.preset-tag.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.preset-del{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:.65rem;margin-left:2px;background:rgba(255,255,255,.15);transition:var(--transition)}
-.preset-tag:hover .preset-del{background:var(--red-dim);color:var(--red)}
-.preset-tag.active .preset-del{background:rgba(255,255,255,.25)}

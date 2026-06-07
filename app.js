@@ -715,40 +715,30 @@ function onChannelChange() {
   var isPersonal = ch === '個人';
   $('om_manualGroup').style.display = isPersonal ? '' : 'none';
   $('om_productGroup').style.display = '';
-  if (isPersonal) renderPersonalPresets();
+  if (isPersonal) renderPersonalSelect();
   calcOrderPreview();
 }
-function renderPersonalPresets() {
+function renderPersonalSelect(selected) {
   var presets = getPersonalPresets();
-  // datalist
-  var dlHtml = '';
-  presets.forEach(function(p) { dlHtml += '<option value="' + esc(p) + '">' });
-  $('personalPresetList').innerHTML = dlHtml;
-  // tags
-  var custom = JSON.parse(localStorage.getItem('proxy-personal-presets') || '[]');
-  var html = '';
+  var sel = selected || $('om_personalSelect').value || '';
+  var h = '<option value="">— 選擇商品 —</option>';
   presets.forEach(function(p) {
-    var isCustom = custom.indexOf(p) >= 0;
-    var isActive = $('om_manualName').value === p;
-    html += '<button type="button" class="preset-tag' + (isActive ? ' active' : '') + '" data-action="pickPreset" data-id="' + esc(p) + '">' + esc(p) +
-      (isCustom ? '<span class="preset-del" data-action="delPreset" data-id="' + esc(p) + '">✕</span>' : '') +
-      '</button>';
+    h += '<option value="' + esc(p) + '"' + (sel === p ? ' selected' : '') + '>' + esc(p) + '</option>';
   });
-  $('personalPresetTags').innerHTML = html;
+  h += '<option value="__custom__"' + (sel === '__custom__' ? ' selected' : '') + '>其他（自訂）</option>';
+  $('om_personalSelect').innerHTML = h;
+  $('om_customNameGroup').style.display = sel === '__custom__' ? '' : 'none';
 }
-function pickPreset(name) {
-  $('om_manualName').value = name;
-  // Clear product dropdown since using manual name
-  $('om_product').value = '';
-  renderPersonalPresets();
+function onPersonalSelect() {
+  var val = $('om_personalSelect').value;
+  $('om_customNameGroup').style.display = val === '__custom__' ? '' : 'none';
+  if (val && val !== '__custom__') {
+    $('om_manualName').value = val;
+    $('om_product').value = '';
+  } else if (val === '__custom__') {
+    $('om_manualName').value = '';
+  }
   calcOrderPreview();
-}
-function addPresetFromInput() {
-  var name = $('om_manualName').value.trim();
-  if (!name) return toast('請先輸入商品名稱', 'err');
-  addPersonalPreset(name);
-  renderPersonalPresets();
-  toast(name + ' 已加入常用清單', 'ok');
 }
 function openOrderModal(item) {
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
@@ -794,6 +784,17 @@ function openOrderModal(item) {
   dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
   $('om_notes').value = item ? (item.notes || '') : '';
   $('om_manualName').value = item ? (item.platform || '') : '';
+
+  // Set personal select when editing a personal-channel order
+  if (item && (item.channel || '8591') === '個人' && !pid) {
+    var presets = getPersonalPresets();
+    var editName = item.platform || '';
+    if (presets.indexOf(editName) >= 0) {
+      renderPersonalSelect(editName);
+    } else {
+      renderPersonalSelect('__custom__');
+    }
+  }
 
   onChannelChange();
   if (item) calcOrderPreview();
@@ -863,7 +864,7 @@ function saveOrder() {
     channel: ch,
     status: $('om_status').value,
     product_id: pid || null,
-    platform: p ? p.platform : manualName,
+    platform: p ? p.platform : (ch === '個人' && $('om_personalSelect').value && $('om_personalSelect').value !== '__custom__' ? $('om_personalSelect').value : manualName),
     version: p ? p.version : '',
     duration: p ? p.duration : '',
     qty: Number($('om_qty').value) || 1,
@@ -877,8 +878,8 @@ function saveOrder() {
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
-  // Auto-remember personal channel product names
-  if (ch === '個人' && manualName && !pid) addPersonalPreset(manualName);
+  // Auto-remember custom personal channel product names
+  if (ch === '個人' && $('om_personalSelect').value === '__custom__' && manualName) addPersonalPreset(manualName);
 
   var id = $('om_id').value;
   if (id) obj.order_no = orders.filter(function(o) { return o.id === id })[0].order_no;
@@ -1204,14 +1205,6 @@ document.addEventListener('click', function(e) {
     case 'deleteCustomer': deleteCustomer(id); break;
     case 'editAd': editAd(id); break;
     case 'deleteAd': deleteAd(id); break;
-    case 'pickPreset': pickPreset(id); break;
-    case 'delPreset':
-      e.stopPropagation();
-      removePersonalPreset(id);
-      if ($('om_manualName').value === id) $('om_manualName').value = '';
-      renderPersonalPresets();
-      toast(id + ' 已移除', 'ok');
-      break;
   }
 });
 
