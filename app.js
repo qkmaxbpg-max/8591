@@ -1224,10 +1224,18 @@ document.addEventListener('click', function(e) {
 
 /* ──── Settings ──── */
 function openSettings() {
+  var mode = localStorage.getItem('proxy-ocr-mode') || 'free';
+  $('set_ocrMode').value = mode;
   $('set_apiKey').value = localStorage.getItem('proxy-api-key') || '';
+  $('apiKeyGroup').style.display = mode === 'ai' ? '' : 'none';
+  $('set_ocrMode').onchange = function() {
+    $('apiKeyGroup').style.display = this.value === 'ai' ? '' : 'none';
+  };
   openModal('settingsModal');
 }
 function saveSettings() {
+  var mode = $('set_ocrMode').value;
+  localStorage.setItem('proxy-ocr-mode', mode);
   var key = $('set_apiKey').value.trim();
   if (key) localStorage.setItem('proxy-api-key', key);
   else localStorage.removeItem('proxy-api-key');
@@ -1240,12 +1248,6 @@ var ocrParsedOrders = [];
 var ocrImageBase64 = '';
 
 function openOcrModal() {
-  var key = localStorage.getItem('proxy-api-key');
-  if (!key) {
-    toast('請先到設定（⚙）填入 Anthropic API Key', 'err');
-    openSettings();
-    return;
-  }
   resetOcr();
   openModal('ocrModal');
 }
@@ -1306,15 +1308,152 @@ function handleOcrFile(file) {
     $('ocrStatus').style.display = 'flex';
     $('btnOcrRetry').style.display = '';
 
-    // Call Claude API
-    callClaudeVision(ocrImageBase64, mediaType);
+    var mode = localStorage.getItem('proxy-ocr-mode') || 'free';
+    if (mode === 'ai' && localStorage.getItem('proxy-api-key')) {
+      callClaudeVision(ocrImageBase64, mediaType);
+    } else {
+      callTesseractOCR(file);
+    }
   };
   reader.readAsDataURL(file);
 }
 
+/* ──── Free OCR: Tesseract.js ──── */
+function callTesseractOCR(file) {
+  Tesseract.recognize(file, 'chi_tra+eng', {
+    logger: function(m) {
+      if (m.status === 'recognizing text' && m.progress) {
+        var pct = Math.round(m.progress * 100);
+        $('ocrStatus').querySelector('span').textContent = '辨識中... ' + pct + '%';
+      }
+    }
+  }).then(function(result) {
+    var text = result.data.text;
+    ocrParsedOrders = parseOcrText(text);
+    if (ocrParsedOrders.length === 0) {
+      $('ocrStatus').style.display = 'none';
+      toast('沒有辨識到訂單資料，請確認截圖清晰', 'err');
+      return;
+    }
+    showOcrResults();
+  }).catch(function(err) {
+    $('ocrStatus').style.display = 'none';
+    toast('辨識失敗：' + err.message, 'err');
+  });
+}
+
+/* Parse OCR text into order objects */
+function parseOcrText(text) {
+  var orders = [];
+  // Split by buyer lines
+  var blocks = text.split(/(?=買家|賣家)/);
+  blocks.forEach(function(block) {
+    if (block.length < 10) return;
+    var o = parseOcrBlock(block);
+    if (o) orders.push(o);
+  });
+
+  // If splitting by buyer didn't work, try splitting by date pattern
+  if (orders.length === 0) {
+    blocks = text.split(/(?=\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+    blocks.forEach(function(block) {
+      if (block.length < 10) return;
+      var o = parseOcrBlock(block);
+      if (o) orders.push(o);
+    });
+  }
+
+  // Last resort: treat whole text as one block
+  if (orders.length === 0) {
+    var o = parseOcrBlock(text);
+    if (o) orders.push(o);
+  }
+
+  return orders;
+}
+
+function parseOcrBlock(block) {
+  // Date: 下單時間：YYYY-MM-DD or just YYYY-MM-DD or YYYY/MM/DD
+  var dateMatch = block.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+  var orderDate = '';
+  if (dateMatch) {
+    var mm = dateMatch[2].length < 2 ? '0' + dateMatch[2] : dateMatch[2];
+    var dd = dateMatch[3].length < 2 ? '0' + dateMatch[3] : dateMatch[3];
+    orderDate = dateMatch[1] + '-' + mm + '-' + dd;
+  }
+
+  // Price: $NNN or $N,NNN
+  var priceMatch = block.match(/\$\s*([\d,]+)/);
+  var price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
+
+  // Quantity: xN or x N
+  var qtyMatch = block.match(/x\s*(\d+)/i);
+  var qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+
+  // Buyer: No.NNNNNNN
+  var buyerMatch = block.match(/No\.\s*(\d+)/);
+  var buyer = buyerMatch ? 'No.' + buyerMatch[1] : '';
+
+  // Platform: known product names
+  var platform = '';
+  var knownProducts = [
+    'Discord Nitro', 'YouTube Premium', 'YouTube Music', 'Netflix',
+    'Spotify', 'Nintendo', 'PlayStation', 'Xbox Game Pass', 'EA Play',
+    'Apple Music', 'Google One', 'Canva', 'ChatGPT', 'Claude',
+    'Adobe', 'Microsoft 365', 'Office 365', 'Disney', 'HBO',
+    'Crunchyroll', 'Steam'
+  ];
+  var blockLower = block.toLowerCase();
+  for (var i = 0; i < knownProducts.length; i++) {
+    if (blockLower.indexOf(knownProducts[i].toLowerCase()) >= 0) {
+      platform = knownProducts[i];
+      break;
+    }
+  }
+  // Also try extracting from "Category/SubType" pattern
+  if (!platform) {
+    var catMatch = block.match(/([A-Za-z][A-Za-z\s]+(?:Nitro|Premium|Music|Plus|Pro|Basic)?)\s*[\/\\]/);
+    if (catMatch) platform = catMatch[1].trim();
+  }
+
+  // Version/Item: 品項：details
+  var version = '';
+  var itemMatch = block.match(/品項[：:]*\s*(.+)/);
+  if (itemMatch) {
+    version = itemMatch[1].trim()
+      .replace(/^[◆☆★●○▶►▪▸※\s]+/, '')
+      .replace(/\*\s*\d+$/, '')
+      .replace(/x\s*\d+$/i, '')
+      .trim();
+  }
+
+  // Status
+  var status = '已完成';
+  if (block.indexOf('已完成') >= 0 || block.indexOf('完成') >= 0) status = '已完成';
+  else if (block.indexOf('處理中') >= 0 || block.indexOf('交易中') >= 0) status = '處理中';
+  else if (block.indexOf('已取消') >= 0 || block.indexOf('取消') >= 0) status = '已取消';
+  else if (block.indexOf('已退款') >= 0 || block.indexOf('退款') >= 0) status = '已退款';
+
+  // Must have at least price to be valid
+  if (!price) return null;
+
+  return {
+    order_date: orderDate,
+    platform: platform || '未分類',
+    version: version,
+    qty: qty,
+    unit_price: price,
+    buyer: buyer,
+    status: status
+  };
+}
+
+/* ──── AI OCR: Claude Vision (optional, paid) ──── */
 function callClaudeVision(base64, mediaType) {
   var apiKey = localStorage.getItem('proxy-api-key');
   if (!apiKey) { toast('請先設定 API Key', 'err'); return }
+
+  $('ocrStatus').querySelector('span').textContent = 'AI 辨識中，請稍候...';
 
   var prompt = '你是一個 8591 訂單資料擷取工具。請分析這張截圖中的所有訂單資料。\n\n' +
     '每筆訂單請擷取以下欄位：\n' +
@@ -1358,7 +1497,6 @@ function callClaudeVision(base64, mediaType) {
   })
   .then(function(data) {
     var text = data.content[0].text.trim();
-    // Extract JSON from response (might be wrapped in code blocks)
     var jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('無法解析回應');
     ocrParsedOrders = JSON.parse(jsonMatch[0]);

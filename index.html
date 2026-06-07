@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -313,9 +313,17 @@
   </div>
   <div class="modal-body">
     <div class="form-group">
-      <label>Anthropic API Key（截圖辨識用）</label>
+      <label>截圖辨識模式</label>
+      <select id="set_ocrMode">
+        <option value="free">免費（Tesseract OCR）</option>
+        <option value="ai">高精度（Claude AI，需 API Key）</option>
+      </select>
+      <p class="hint">免費模式完全離線處理，高精度模式辨識更準確</p>
+    </div>
+    <div class="form-group" id="apiKeyGroup" style="display:none">
+      <label>Anthropic API Key</label>
       <input id="set_apiKey" type="password" placeholder="sk-ant-...">
-      <p class="hint">到 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得，儲存在本機</p>
+      <p class="hint">到 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得</p>
     </div>
   </div>
   <div class="modal-foot">
@@ -335,7 +343,7 @@
       <div class="ocr-placeholder" id="ocrPlaceholder">
         <div class="icon">📷</div>
         <p>點擊上傳截圖，或拖拽圖片到此處</p>
-        <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單</p>
+        <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單（免費離線辨識）</p>
         <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
       </div>
       <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
@@ -357,7 +365,8 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
