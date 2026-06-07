@@ -143,13 +143,18 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('exp_date', { ascending: false })
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
   ]).then(function(res) {
+    // Log any table errors
+    res.forEach(function(r, i) {
+      if (r.error) console.warn('Table load error [' + i + ']:', r.error.message);
+    });
     products = res[0].data || [];
     agents = res[1].data || [];
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
+    if (res[4].error) toast('廣告資料載入失敗：請確認已執行 ALTER TABLE ads RENAME TO ad_spends', 'err');
     renderAll();
   });
 }
@@ -1178,8 +1183,10 @@ function saveExp() {
       ? sb.from('ad_spends').update(obj).eq('id', id)
       : sb.from('ad_spends').insert(obj);
     req.then(function(res) {
-      if (res.error) return toast(res.error.message, 'err');
+      if (res.error) return toast('儲存失敗：' + res.error.message, 'err');
       closeModal(); loadAll(); toast('廣告記錄已儲存', 'ok');
+    }).catch(function(err) {
+      toast('儲存失敗：' + err.message, 'err');
     });
   }
 }
