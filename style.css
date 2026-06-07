@@ -231,6 +231,19 @@ tr:hover td{background:var(--bg2)}
 .hint{font-size:.75rem;color:var(--fg2);margin-top:4px}
 .hint a{color:var(--accent)}
 
+/* Import Tabs */
+.import-tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--bg2);border-radius:var(--radius-sm);padding:3px}
+.import-tab{flex:1;padding:8px;border:none;background:transparent;color:var(--fg2);font-size:.85rem;font-weight:500;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition)}
+.import-tab.active{background:var(--accent);color:#fff}
+.import-tab:hover:not(.active){background:var(--bg3)}
+.import-tab-content{display:none}
+.import-tab-content.active{display:block}
+.import-hint{font-size:.82rem;color:var(--fg2);margin-bottom:10px;line-height:1.5}
+.import-hint strong{color:var(--fg0)}
+#pasteArea{width:100%;padding:12px;background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);color:var(--fg0);font-family:inherit;font-size:.85rem;resize:vertical;line-height:1.5}
+#pasteArea:focus{border-color:var(--accent);outline:none}
+#pasteArea::placeholder{color:var(--fg3)}
+
 /* OCR Import */
 .btn.accent{background:var(--green);color:#000;font-weight:600}
 .btn.accent:hover{background:#2bc489}

@@ -1247,12 +1247,22 @@ function saveSettings() {
 var ocrParsedOrders = [];
 var ocrImageBase64 = '';
 
-function openOcrModal() {
-  resetOcr();
-  openModal('ocrModal');
+function openImportModal() {
+  resetImport();
+  openModal('importModal');
 }
 
-function resetOcr() {
+function switchImportTab(tab) {
+  var tabs = document.querySelectorAll('.import-tab');
+  var contents = document.querySelectorAll('.import-tab-content');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].textContent.indexOf(tab === 'paste' ? '貼上' : '截圖') >= 0);
+  }
+  $('importTab-paste').classList.toggle('active', tab === 'paste');
+  $('importTab-screenshot').classList.toggle('active', tab === 'screenshot');
+}
+
+function resetImport() {
   ocrParsedOrders = [];
   ocrImageBase64 = '';
   $('ocrPlaceholder').style.display = '';
@@ -1262,6 +1272,19 @@ function resetOcr() {
   $('btnOcrImport').style.display = 'none';
   $('btnOcrRetry').style.display = 'none';
   $('ocrFile').value = '';
+  $('pasteArea').value = '';
+  switchImportTab('paste');
+}
+
+function parsePastedText() {
+  var text = $('pasteArea').value.trim();
+  if (!text) return toast('請先貼上 8591 訂單文字', 'err');
+  ocrParsedOrders = parseOcrText(text);
+  if (ocrParsedOrders.length === 0) {
+    toast('沒有解析到訂單資料，請確認貼上的內容包含訂單', 'err');
+    return;
+  }
+  showOcrResults();
 }
 
 // Click to upload

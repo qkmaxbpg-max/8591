@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -89,7 +89,7 @@
   <section id="tab-orders" class="tab-content">
     <div class="toolbar">
       <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
-      <button class="btn accent" onclick="openOcrModal()">📷 截圖匯入</button>
+      <button class="btn accent" onclick="openImportModal()">⚡ 快速匯入</button>
       <div class="search-group">
         <input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()">
         <select id="orderChannelFilter" onchange="renderOrders()">
@@ -332,41 +332,58 @@
   </div>
 </div>
 
-<!-- OCR Import Modal -->
-<div id="ocrModal" class="modal modal-lg">
+<!-- Import Modal -->
+<div id="importModal" class="modal modal-lg">
   <div class="modal-head">
-    <h3>📷 截圖匯入訂單</h3>
+    <h3>⚡ 快速匯入訂單</h3>
     <button class="close-btn" onclick="closeModal()">&times;</button>
   </div>
   <div class="modal-body">
-    <div id="ocrUploadArea" class="ocr-upload">
-      <div class="ocr-placeholder" id="ocrPlaceholder">
-        <div class="icon">📷</div>
-        <p>點擊上傳截圖，或拖拽圖片到此處</p>
-        <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單（免費離線辨識）</p>
-        <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
+    <div class="import-tabs">
+      <button class="import-tab active" onclick="switchImportTab('paste')">📋 貼上文字</button>
+      <button class="import-tab" onclick="switchImportTab('screenshot')">📷 截圖辨識</button>
+    </div>
+
+    <!-- Paste Tab -->
+    <div id="importTab-paste" class="import-tab-content active">
+      <p class="import-hint">在 8591 訂單頁面<strong>選取訂單文字</strong> → 複製 → 貼到下方，100% 準確</p>
+      <textarea id="pasteArea" rows="8" placeholder="在 8591 頁面選取訂單區域的文字，Ctrl+C 複製後，在這裡 Ctrl+V 貼上..."></textarea>
+      <button class="btn primary full" onclick="parsePastedText()" style="margin-top:8px">解析訂單</button>
+    </div>
+
+    <!-- Screenshot Tab -->
+    <div id="importTab-screenshot" class="import-tab-content">
+      <div id="ocrUploadArea" class="ocr-upload">
+        <div class="ocr-placeholder" id="ocrPlaceholder">
+          <div class="icon">📷</div>
+          <p>點擊上傳截圖，或拖拽圖片到此處</p>
+          <p class="sub">支援 8591 訂單頁面截圖，可包含多筆訂單</p>
+          <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
+        </div>
+        <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
       </div>
-      <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
+      <div id="ocrStatus" style="display:none" class="ocr-status">
+        <div class="spinner"></div>
+        <span>辨識中...</span>
+      </div>
     </div>
-    <div id="ocrStatus" style="display:none" class="ocr-status">
-      <div class="spinner"></div>
-      <span>AI 辨識中，請稍候...</span>
-    </div>
+
+    <!-- Results (shared) -->
     <div id="ocrResults" style="display:none">
-      <h4 style="margin-bottom:8px">辨識結果（確認後匯入）</h4>
+      <h4 style="margin:12px 0 8px">解析結果（確認後匯入）</h4>
       <div id="ocrOrderList"></div>
       <div class="ocr-summary" id="ocrSummary"></div>
     </div>
   </div>
   <div class="modal-foot">
     <button class="btn ghost" onclick="closeModal()">取消</button>
-    <button class="btn ghost" id="btnOcrRetry" style="display:none" onclick="resetOcr()">重新上傳</button>
+    <button class="btn ghost" id="btnOcrRetry" style="display:none" onclick="resetImport()">重新來</button>
     <button class="btn primary" id="btnOcrImport" style="display:none" onclick="importOcrOrders()">匯入全部</button>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
