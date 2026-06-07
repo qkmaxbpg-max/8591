@@ -98,7 +98,7 @@ function enterApp(label) {
   $('userLabel').textContent = label;
   mpInit('mpDash', renderDashboard);
   mpInit('mpOrders', renderOrders);
-  mpInit('mpAds', renderAds);
+  mpInit('mpExp', renderAds);
   loadAll();
   // Share auth token with Chrome extension (if installed)
   shareTokenWithExtension();
@@ -143,7 +143,7 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('exp_date', { ascending: false })
   ]).then(function(res) {
     products = res[0].data || [];
     agents = res[1].data || [];
@@ -1097,10 +1097,10 @@ function deleteCustomer(id) {
 
 /* ──── Ads ──── */
 function renderAds() {
-  var ym = mpGetYM('mpAds');
-  var isAll = mpIsAll('mpAds');
-  var isYear = mpIsYear('mpAds');
-  var yy = mpGetYear('mpAds');
+  var ym = mpGetYM('mpExp');
+  var isAll = mpIsAll('mpExp');
+  var isYear = mpIsYear('mpExp');
+  var yy = mpGetYear('mpExp');
   var list = ads.filter(function(a) {
     if (isAll) return true;
     var d = a.ad_date || '';
@@ -1121,10 +1121,10 @@ function renderAds() {
   Object.keys(platMap).sort(function(a, b) { return platMap[b] - platMap[a] }).forEach(function(p) {
     statHtml += statCard(p, 'NT$' + fmtN(platMap[p]), fmtP(total > 0 ? platMap[p] / total : 0));
   });
-  $('adStatCards').innerHTML = statHtml;
+  $('expStatCards').innerHTML = statHtml;
 
   if (list.length === 0) {
-    $('adList').innerHTML = '<div class="empty"><div class="icon">📢</div><p>尚無廣告記錄</p></div>';
+    $('expList').innerHTML = '<div class="empty"><div class="icon">📢</div><p>尚無廣告記錄</p></div>';
     return;
   }
   var h = '<table><tr><th>日期</th><th>廣告平台</th><th class="text-right">金額</th><th>備註</th><th>操作</th></tr>';
@@ -1133,34 +1133,34 @@ function renderAds() {
       '<td class="text-right text-red">NT$' + fmtN(a.amount) + '</td>' +
       '<td>' + esc(a.notes || '') + '</td>' +
       '<td><div class="act-group">' +
-        '<button class="act-btn edit" data-action="editAd" data-id="' + a.id + '">編輯</button>' +
-        '<button class="act-btn del" data-action="deleteAd" data-id="' + a.id + '">刪除</button>' +
+        '<button class="act-btn edit" data-action="editExp" data-id="' + a.id + '">編輯</button>' +
+        '<button class="act-btn del" data-action="deleteExp" data-id="' + a.id + '">刪除</button>' +
       '</div></td></tr>';
   });
-  $('adList').innerHTML = h + '</table>';
+  $('expList').innerHTML = h + '</table>';
 }
-function openAdModal(item) {
-  $('adModalTitle').textContent = item ? '編輯廣告支出' : '新增廣告支出';
-  $('ad_id').value = item ? item.id : '';
-  dpInit('ad_date', { value: item ? item.ad_date : today() });
-  $('ad_amount').value = item ? item.amount : '';
-  $('ad_platform').value = item ? (item.ad_platform || '') : '8591';
-  $('ad_notes').value = item ? (item.notes || '') : '';
-  openModal('adModal');
+function openExpModal(item) {
+  $('expModalTitle').textContent = item ? '編輯廣告支出' : '新增廣告支出';
+  $('exp_id').value = item ? item.id : '';
+  dpInit('exp_date', { value: item ? item.ad_date : today() });
+  $('exp_amount').value = item ? item.amount : '';
+  $('exp_platform').value = item ? (item.ad_platform || '') : '8591';
+  $('exp_notes').value = item ? (item.notes || '') : '';
+  openModal('expModal');
 }
-function editAd(id) {
+function editExp(id) {
   var item = ads.filter(function(a) { return a.id === id })[0];
-  if (item) openAdModal(item);
+  if (item) openExpModal(item);
 }
-function saveAd() {
+function saveExp() {
   var obj = {
-    ad_date: dpGetVal('ad_date'),
-    amount: Number($('ad_amount').value) || 0,
-    ad_platform: $('ad_platform').value.trim(),
-    notes: $('ad_notes').value.trim()
+    ad_date: dpGetVal('exp_date'),
+    amount: Number($('exp_amount').value) || 0,
+    ad_platform: $('exp_platform').value.trim(),
+    notes: $('exp_notes').value.trim()
   };
   if (!obj.amount) return toast('請填寫金額', 'err');
-  var id = $('ad_id').value;
+  var id = $('exp_id').value;
   if (isDemo) {
     if (id) {
       var idx = ads.findIndex(function(a) { return a.id === id });
@@ -1181,7 +1181,7 @@ function saveAd() {
     });
   }
 }
-function deleteAd(id) {
+function deleteExp(id) {
   confirmAction('確定要刪除此廣告記錄？', function() {
     if (isDemo) {
       ads = ads.filter(function(a) { return a.id !== id });
@@ -1217,8 +1217,8 @@ document.addEventListener('click', function(e) {
     case 'deleteAgent': deleteAgent(id); break;
     case 'editCustomer': editCustomer(id); break;
     case 'deleteCustomer': deleteCustomer(id); break;
-    case 'editAd': editAd(id); break;
-    case 'deleteAd': deleteAd(id); break;
+    case 'editExp': editExp(id); break;
+    case 'deleteExp': deleteExp(id); break;
   }
 });
 
