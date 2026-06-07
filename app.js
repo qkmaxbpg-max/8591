@@ -1447,6 +1447,9 @@ function parseOcrText(text) {
 }
 
 function parseOcrBlock(block) {
+  // Remove all zero-width and invisible unicode chars
+  block = block.replace(/[​-‍﻿]/g, '');
+
   // 1. Date
   var dateMatch = block.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   var orderDate = '';
@@ -1460,37 +1463,60 @@ function parseOcrBlock(block) {
   var qtyMatch = block.match(/x\s*(\d+)/i);
   var qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
 
-  // 3. Selling price — find ALL "$NNN", skip title prices ("$NNN起" / "最低$NNN")
+  // 3. Selling price — multiple strategies
   var price = 0;
-  var allPrices = [];
-  var priceRe = /\$\s*([\d,]+)/g;
-  var pm;
-  while ((pm = priceRe.exec(block)) !== null) {
-    var val = parseInt(pm[1].replace(/,/g, '')) || 0;
-    if (!val) continue;
-    var after = block.substring(pm.index + pm[0].length, pm.index + pm[0].length + 5);
-    var before = block.substring(Math.max(0, pm.index - 10), pm.index);
-    var isTitle = /起/.test(after) || /最低|低/.test(before);
-    allPrices.push({ val: val, isTitle: isTitle });
+
+  // Strategy A: find $NNN near "x1" (allow up to 30 chars gap, including newlines)
+  var xPriceMatch = block.match(/x\s*\d+[\s\S]{0,30}?\$\s*([\d,]+)/i);
+  if (xPriceMatch) {
+    price = parseInt(xPriceMatch[1].replace(/,/g, '')) || 0;
   }
-  var realPrices = allPrices.filter(function(p) { return !p.isTitle; });
-  if (realPrices.length > 0) price = realPrices[0].val;
-  else if (allPrices.length > 0) price = allPrices[allPrices.length - 1].val;
-  // Fallback: bare number after xN
+
+  // Strategy B: find $NNN on same line as "完成"
   if (!price) {
-    var bareNum = block.match(/x\s*\d+\s+(\d{2,})/i);
-    if (bareNum) price = parseInt(bareNum[1]) || 0;
+    var lines = block.split(/[\n\r]+/);
+    for (var li = 0; li < lines.length; li++) {
+      if (/完成|處理中/.test(lines[li])) {
+        var lpm = lines[li].match(/\$\s*([\d,]+)/);
+        if (lpm) { price = parseInt(lpm[1].replace(/,/g, '')) || 0; break; }
+      }
+    }
+  }
+
+  // Strategy C: find all $NNN, exclude title prices, take first non-title
+  if (!price) {
+    var allPrices = [];
+    var priceRe = /\$\s*([\d,]+)/g;
+    var pm;
+    while ((pm = priceRe.exec(block)) !== null) {
+      var val = parseInt(pm[1].replace(/,/g, '')) || 0;
+      if (!val) continue;
+      // Title price: has 起 within 10 chars after, or 最低 within 15 chars before
+      // Also check with spaces (OCR: "起" might be "起 " or " 起")
+      var after = block.substring(pm.index + pm[0].length, pm.index + pm[0].length + 10);
+      var before = block.substring(Math.max(0, pm.index - 15), pm.index);
+      // Check line containing this price for title indicators
+      var lineStart = block.lastIndexOf('\n', pm.index) + 1;
+      var lineEnd = block.indexOf('\n', pm.index); if (lineEnd < 0) lineEnd = block.length;
+      var priceLine = block.substring(lineStart, lineEnd);
+      var isTitle = /起/.test(after) || /最低/.test(before) || /代儲|貓玩|最低/.test(priceLine);
+      allPrices.push({ val: val, isTitle: isTitle });
+    }
+    var real = allPrices.filter(function(p) { return !p.isTitle; });
+    if (real.length > 0) price = real[0].val;
+    else if (allPrices.length > 1) price = allPrices[allPrices.length - 1].val;
+    else if (allPrices.length === 1) price = allPrices[0].val;
   }
 
   // 4. Buyer
   var buyerMatch = block.match(/No\.?\s*(\d{4,})/);
   var buyer = buyerMatch ? 'No.' + buyerMatch[1] : '';
 
-  // 5. Platform: "Name/Category" line or known names
+  // 5. Platform
   var platform = '';
-  var lines = block.split(/[\n\r]+/);
-  for (var li = 0; li < lines.length; li++) {
-    var cm = lines[li].match(/^\s*([A-Za-z][A-Za-z\s]*(?:Nitro|Premium|Music|Plus|Pro|Basic|Standard|Family|Pass)?)\s*[\/／]/);
+  var blines = block.split(/[\n\r]+/);
+  for (var li = 0; li < blines.length; li++) {
+    var cm = blines[li].match(/^\s*([A-Za-z][A-Za-z\s]*(?:Nitro|Premium|Music|Plus|Pro|Basic|Standard|Family|Pass)?)\s*[\/／]/);
     if (cm) { platform = cm[1].trim(); break; }
   }
   if (!platform) {
@@ -1505,13 +1531,12 @@ function parseOcrBlock(block) {
     }
   }
 
-  // 6. 品項 — try many OCR variations of "品項："
+  // 6. 品項 — extract then clean up OCR noise
   var version = '';
   var itemPatterns = [
-    /品項\s*[：:﹕]\s*(.+)/,
-    /品\s*項\s*[：:﹕]?\s*(.+)/,
-    /品[項项頂瑣]\s*[：:﹕]?\s*(.+)/,
-    /晶項\s*[：:﹕]?\s*(.+)/,
+    /品\s*項\s*[：:﹕]\s*(.+)/,
+    /品[項项頂]\s*[：:﹕]?\s*(.+)/,
+    /晶\s*項\s*[：:﹕]?\s*(.+)/,
     /品.\s*[：:﹕]\s*(.+)/
   ];
   for (var pi = 0; pi < itemPatterns.length; pi++) {
@@ -1519,7 +1544,12 @@ function parseOcrBlock(block) {
     if (im) {
       version = im[1].trim()
         .replace(/^[◆☆★●○▶►▪▸※\-\s]+/, '')
-        .replace(/\s*(評價|自助退款|查看訂單|已評價|評價買家|自助|退款).*$/g, '')
+        // Remove trailing UI text — handle OCR spaces between chars: 自 助 退 款, 評 價 etc.
+        .replace(/\s*[評自查已]\s*[價助看評]\s*[買退訂]\s*[家款單].*$/g, '')
+        .replace(/\s*自\s*助\s*退\s*款.*$/g, '')
+        .replace(/\s*評\s*價\s*買\s*家.*$/g, '')
+        .replace(/\s*已\s*評\s*價.*$/g, '')
+        .replace(/\s*查\s*看\s*訂\s*單.*$/g, '')
         .trim();
       if (version) break;
     }
@@ -1632,36 +1662,71 @@ function showOcrResults() {
 }
 
 function matchProductCost(platform, version) {
-  // Match by 品項 (version) first — most specific, then fallback to platform
+  /*  Match OCR 品項 text to product database.
+      Examples:
+        品項 "加成3個月 - 2次*1" → product version="兩次加成", duration="3個月"
+        品項 "贈禮版/ 30天*2" → product version="贈禮版", duration="1個月"
+        品項 "登入版/ 1個月*1" → product version="登入版", duration="1個月"
+      Strategy: normalize the OCR text, extract keywords, score each product.
+  */
+  if (!version && !platform) return 0;
+
+  // Normalize OCR text: remove spaces between CJK chars that OCR added
+  var ocrText = (version || '').replace(/\s+/g, '');
+  var ocrLower = ocrText.toLowerCase();
+  var platLower = (platform || '').toLowerCase();
+
   var bestMatch = null, bestScore = 0;
+
   products.forEach(function(p) {
     if (p.status !== '啟用') return;
     var score = 0;
-    var pName = (p.platform || '').toLowerCase();
-    var oName = (platform || '').toLowerCase();
-    var pVer = (p.version || '').toLowerCase();
-    var oVer = (version || '').toLowerCase();
+    var pPlat = (p.platform || '').toLowerCase();
+    var pVer = (p.version || '').replace(/\s+/g, '');
+    var pDur = (p.duration || '').replace(/\s+/g, '');
 
-    // Platform match
-    if (oName && pName && (oName.indexOf(pName) >= 0 || pName.indexOf(oName) >= 0)) {
+    // Platform must match first
+    if (platLower && pPlat && (platLower.indexOf(pPlat) >= 0 || pPlat.indexOf(platLower) >= 0)) {
       score += 1;
+    } else if (platLower && pPlat) {
+      return; // platform doesn't match, skip
     }
 
-    // Version/品項 match — highest priority
-    if (oVer && pVer) {
-      // Exact or substring match
-      if (oVer.indexOf(pVer) >= 0 || pVer.indexOf(oVer) >= 0) {
-        score += 10;
-      } else {
-        // Fuzzy: check if key parts match (e.g. "加成3個月" in "加成3個月 - 2次*1")
-        var pWords = pVer.replace(/[\/\-\*\s]+/g, ' ').split(' ').filter(function(w) { return w.length > 1; });
-        var matchedWords = pWords.filter(function(w) { return oVer.indexOf(w) >= 0; });
-        if (matchedWords.length > 0) score += matchedWords.length * 3;
-      }
+    if (!ocrLower) {
+      if (score > bestScore) { bestScore = score; bestMatch = p; }
+      return;
     }
+
+    // Direct version match: "贈禮版" in "贈禮版/30天*2"
+    if (pVer && ocrLower.indexOf(pVer.toLowerCase()) >= 0) {
+      score += 20;
+    }
+
+    // Keyword-based matching for complex names
+    // "兩次加成" ↔ "加成3個月-2次*1": check "加成" AND "2次"/"兩次"
+    if (pVer) {
+      var pvl = pVer.toLowerCase();
+      // Check if product version keywords appear in OCR text
+      if (pvl.indexOf('加成') >= 0 && ocrLower.indexOf('加成') >= 0) score += 10;
+      if (pvl.indexOf('兩次') >= 0 && /[2兩]\s*次/.test(ocrText)) score += 10;
+      if (pvl.indexOf('贈禮') >= 0 && ocrLower.indexOf('贈禮') >= 0) score += 15;
+      if (pvl.indexOf('登入') >= 0 && ocrLower.indexOf('登入') >= 0) score += 15;
+      if (pvl.indexOf('免登') >= 0 && ocrLower.indexOf('免登') >= 0) score += 15;
+    }
+
+    // Duration matching: "3個月" in "加成3個月"
+    if (pDur && ocrLower.indexOf(pDur.toLowerCase()) >= 0) {
+      score += 5;
+    }
+    // Also check "30天" ≈ "1個月"
+    if (pDur === '1個月' && /30\s*天/.test(ocrText)) score += 5;
+    if (pDur === '12個月' && /365\s*天|12\s*個\s*月/.test(ocrText)) score += 5;
+    if (pDur === '3個月' && /90\s*天|3\s*個\s*月/.test(ocrText)) score += 5;
 
     if (score > bestScore) { bestScore = score; bestMatch = p; }
   });
+
+  console.log('matchProductCost:', version, '→', bestMatch ? bestMatch.version + ' cost=' + bestMatch.cost : 'no match', 'score=' + bestScore);
   return bestMatch ? bestMatch.cost : 0;
 }
 
