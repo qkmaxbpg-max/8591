@@ -1395,54 +1395,60 @@ function callTesseractOCR(file) {
   });
 }
 
-/* Parse OCR text into order objects */
+/* Parse OCR text into order objects
+   8591 format per order block:
+   Line 1: 買家：No.XXXXXXX   商品編號：sXXXXXX   下單時間：YYYY-MM-DD HH:MM:SS
+   Line 2: [代儲] ...title...最低$160起...   x1   $320   已完成   查看訂單
+   Line 3: Discord Nitro/其他
+   Line 4: 品項：◆ 加成3個月 - 2次*1
+*/
 function parseOcrText(text) {
-  var orders = [];
-  // Split by buyer lines
-  var blocks = text.split(/(?=買家|賣家)/);
-  blocks.forEach(function(block) {
-    if (block.length < 10) return;
-    var o = parseOcrBlock(block);
-    if (o) orders.push(o);
-  });
+  console.log('===== parseOcrText input =====\n' + text + '\n==============================');
 
-  // If splitting by buyer didn't work, try splitting by date pattern
-  if (orders.length === 0) {
-    blocks = text.split(/(?=\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+  var orders = [];
+  // Try multiple split strategies — OCR may mangle "買家" characters
+  var strategies = [
+    { name: '買家', re: /(?=買\s*家)/ },
+    { name: 'No.', re: /(?=No\.\s*\d{4,})/i },
+    { name: 'datetime', re: /(?=\d{4}[-\/]\d{1,2}[-\/]\d{1,2}\s+\d{1,2}:\d{2})/ },
+    { name: '商品編號', re: /(?=商品[編编]號)/ }
+  ];
+
+  for (var si = 0; si < strategies.length; si++) {
+    var blocks = text.split(strategies[si].re);
+    var parsed = [];
     blocks.forEach(function(block) {
-      if (block.length < 10) return;
+      if (block.trim().length < 5) return;
       var o = parseOcrBlock(block);
-      if (o) orders.push(o);
+      if (o) parsed.push(o);
     });
+    console.log('Split by ' + strategies[si].name + ': ' + blocks.length + ' blocks → ' + parsed.length + ' orders');
+    if (parsed.length > orders.length) orders = parsed;
+    if (orders.length >= 2) break;  // good enough
   }
 
-  // Last resort: treat whole text as one block
+  // Last resort: whole text as one block
   if (orders.length === 0) {
     var o = parseOcrBlock(text);
     if (o) orders.push(o);
   }
 
+  // Dedup by buyer+date+price
+  var seen = {};
+  orders = orders.filter(function(o) {
+    var key = o.buyer + '|' + o.order_date + '|' + o.unit_price;
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+
+  console.log('Total orders: ' + orders.length);
   return orders;
 }
 
 function parseOcrBlock(block) {
-  /*  8591 fixed format (each order block):
-      Line 1: 買家：No.3492787   商品編號：s2249844473   下單時間：2026-06-07 19:41:54
-      Line 2: [代儲] 🐾貓玩聚代儲◆Discord Nitro◆最低$160起🌟   x1   $320   已完成
-      Line 3: Discord Nitro/其他
-      Line 4: 品項：◆ 加成3個月 - 2次*1
-
-      KEY: the title contains "$160起" (starting-price), the REAL selling price is "$320" (standalone).
-      Tesseract may put x1 and $320 on separate lines, so we can NOT rely on "x1 $320" adjacency.
-      Strategy: find all $NNN, exclude any followed by "起", keep the rest.
-  */
-
-  console.log('--- parseOcrBlock input ---');
-  console.log(block);
-
   // 1. Date
-  var dateMatch = block.match(/下單時間[：:]\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-  if (!dateMatch) dateMatch = block.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  var dateMatch = block.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   var orderDate = '';
   if (dateMatch) {
     var mm = dateMatch[2].length < 2 ? '0' + dateMatch[2] : dateMatch[2];
@@ -1454,7 +1460,7 @@ function parseOcrBlock(block) {
   var qtyMatch = block.match(/x\s*(\d+)/i);
   var qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
 
-  // 3. Selling price — find ALL "$NNN" then exclude title prices
+  // 3. Selling price — find ALL "$NNN", skip title prices ("$NNN起" / "最低$NNN")
   var price = 0;
   var allPrices = [];
   var priceRe = /\$\s*([\d,]+)/g;
@@ -1462,71 +1468,62 @@ function parseOcrBlock(block) {
   while ((pm = priceRe.exec(block)) !== null) {
     var val = parseInt(pm[1].replace(/,/g, '')) || 0;
     if (!val) continue;
-    // Check if this price is a title price: followed by "起" within 3 chars
-    var afterPrice = block.substring(pm.index + pm[0].length, pm.index + pm[0].length + 3);
-    var isTitle = /起/.test(afterPrice);
-    // Also check: preceded by "最低" or "低" within 10 chars
-    var beforePrice = block.substring(Math.max(0, pm.index - 10), pm.index);
-    if (/最低|低/.test(beforePrice)) isTitle = true;
-    allPrices.push({ val: val, idx: pm.index, isTitle: isTitle });
+    var after = block.substring(pm.index + pm[0].length, pm.index + pm[0].length + 5);
+    var before = block.substring(Math.max(0, pm.index - 10), pm.index);
+    var isTitle = /起/.test(after) || /最低|低/.test(before);
+    allPrices.push({ val: val, isTitle: isTitle });
   }
-  console.log('All $prices found:', JSON.stringify(allPrices));
-  // Filter out title prices
   var realPrices = allPrices.filter(function(p) { return !p.isTitle; });
-  if (realPrices.length > 0) {
-    price = realPrices[0].val;  // first non-title price = selling price
-  } else if (allPrices.length > 0) {
-    // All prices look like title prices? Take the last one as fallback
-    price = allPrices[allPrices.length - 1].val;
+  if (realPrices.length > 0) price = realPrices[0].val;
+  else if (allPrices.length > 0) price = allPrices[allPrices.length - 1].val;
+  // Fallback: bare number after xN
+  if (!price) {
+    var bareNum = block.match(/x\s*\d+\s+(\d{2,})/i);
+    if (bareNum) price = parseInt(bareNum[1]) || 0;
   }
 
   // 4. Buyer
-  var buyerMatch = block.match(/買家[：:]\s*No\.?\s*(\d+)/);
-  if (!buyerMatch) buyerMatch = block.match(/No\.?\s*(\d{5,})/);
+  var buyerMatch = block.match(/No\.?\s*(\d{4,})/);
   var buyer = buyerMatch ? 'No.' + buyerMatch[1] : '';
 
-  // 5. Platform
+  // 5. Platform: "Name/Category" line or known names
   var platform = '';
-  // Try "Product/Category" line pattern (e.g. "Discord Nitro/其他")
-  var lines = block.split(/\n/);
+  var lines = block.split(/[\n\r]+/);
   for (var li = 0; li < lines.length; li++) {
-    var catMatch = lines[li].match(/^\s*([A-Za-z][A-Za-z\s]*(?:Nitro|Premium|Music|Plus|Pro|Basic|Standard|Family|Pass)?)\s*[\/／]/);
-    if (catMatch) { platform = catMatch[1].trim(); break; }
+    var cm = lines[li].match(/^\s*([A-Za-z][A-Za-z\s]*(?:Nitro|Premium|Music|Plus|Pro|Basic|Standard|Family|Pass)?)\s*[\/／]/);
+    if (cm) { platform = cm[1].trim(); break; }
   }
-  // Fallback: known products
   if (!platform) {
-    var knownProducts = [
-      'Discord Nitro', 'YouTube Premium', 'YouTube Music', 'Netflix',
-      'Spotify Premium', 'Spotify', 'Nintendo Switch Online', 'Nintendo',
-      'PlayStation Plus', 'PlayStation', 'Xbox Game Pass', 'EA Play',
-      'Apple Music', 'Apple TV', 'Google One', 'Canva Pro', 'Canva',
-      'ChatGPT Plus', 'ChatGPT', 'Claude Pro', 'Adobe',
-      'Microsoft 365', 'Office 365', 'Disney+', 'Disney', 'HBO',
-      'Crunchyroll', 'Steam'
-    ];
-    var blockLower = block.toLowerCase();
-    for (var i = 0; i < knownProducts.length; i++) {
-      if (blockLower.indexOf(knownProducts[i].toLowerCase()) >= 0) {
-        platform = knownProducts[i]; break;
-      }
+    var kp = ['Discord Nitro','YouTube Premium','YouTube Music','Netflix',
+      'Spotify Premium','Spotify','Nintendo','PlayStation Plus','PlayStation',
+      'Xbox Game Pass','EA Play','Apple Music','Apple TV','Google One',
+      'Canva Pro','Canva','ChatGPT Plus','ChatGPT','Claude Pro','Adobe',
+      'Microsoft 365','Office 365','Disney+','Disney','HBO','Crunchyroll','Steam'];
+    var bl = block.toLowerCase();
+    for (var i = 0; i < kp.length; i++) {
+      if (bl.indexOf(kp[i].toLowerCase()) >= 0) { platform = kp[i]; break; }
     }
   }
 
-  // 6. 品項 (version/item details)
+  // 6. 品項 — try many OCR variations of "品項："
   var version = '';
-  // Try exact match first
-  var itemMatch = block.match(/品項[：:﹕]\s*(.+)/);
-  if (!itemMatch) {
-    // OCR may read 品項 with slight variations
-    itemMatch = block.match(/品[項项][：:﹕]?\s*(.+)/);
+  var itemPatterns = [
+    /品項\s*[：:﹕]\s*(.+)/,
+    /品\s*項\s*[：:﹕]?\s*(.+)/,
+    /品[項项頂瑣]\s*[：:﹕]?\s*(.+)/,
+    /晶項\s*[：:﹕]?\s*(.+)/,
+    /品.\s*[：:﹕]\s*(.+)/
+  ];
+  for (var pi = 0; pi < itemPatterns.length; pi++) {
+    var im = block.match(itemPatterns[pi]);
+    if (im) {
+      version = im[1].trim()
+        .replace(/^[◆☆★●○▶►▪▸※\-\s]+/, '')
+        .replace(/\s*(評價|自助退款|查看訂單|已評價|評價買家|自助|退款).*$/g, '')
+        .trim();
+      if (version) break;
+    }
   }
-  if (itemMatch) {
-    version = itemMatch[1].trim()
-      .replace(/^[◆☆★●○▶►▪▸※\-\s]+/, '')  // remove leading symbols
-      .replace(/\s*(評價|自助退款|查看訂單|已評價|評價買家).*$/g, '')  // remove trailing UI text
-      .trim();
-  }
-  console.log('品項 extracted:', version);
 
   // 7. Status
   var status = '已完成';
@@ -1537,15 +1534,10 @@ function parseOcrBlock(block) {
   if (!price) return null;
 
   var result = {
-    order_date: orderDate,
-    platform: platform || '未分類',
-    version: version,
-    qty: qty,
-    unit_price: price,
-    buyer: buyer,
-    status: status
+    order_date: orderDate, platform: platform || '未分類', version: version,
+    qty: qty, unit_price: price, buyer: buyer, status: status
   };
-  console.log('parseOcrBlock result:', JSON.stringify(result));
+  console.log('Parsed:', JSON.stringify(result));
   return result;
 }
 
@@ -1640,26 +1632,37 @@ function showOcrResults() {
 }
 
 function matchProductCost(platform, version) {
-  // Try to find matching product in database for auto-fill cost
-  var match = null;
+  // Match by 品項 (version) first — most specific, then fallback to platform
+  var bestMatch = null, bestScore = 0;
   products.forEach(function(p) {
-    if (!match && p.status === '啟用') {
-      var pName = (p.platform || '').toLowerCase();
-      var oName = (platform || '').toLowerCase();
-      if (oName.indexOf(pName) >= 0 || pName.indexOf(oName) >= 0) {
-        // Platform matches, check version if possible
-        if (version && p.version) {
-          var pVer = p.version.toLowerCase();
-          var oVer = version.toLowerCase();
-          if (oVer.indexOf(pVer) >= 0 || pVer.indexOf(oVer) >= 0) {
-            match = p;
-          }
-        }
-        if (!match) match = p; // fallback to platform-only match
+    if (p.status !== '啟用') return;
+    var score = 0;
+    var pName = (p.platform || '').toLowerCase();
+    var oName = (platform || '').toLowerCase();
+    var pVer = (p.version || '').toLowerCase();
+    var oVer = (version || '').toLowerCase();
+
+    // Platform match
+    if (oName && pName && (oName.indexOf(pName) >= 0 || pName.indexOf(oName) >= 0)) {
+      score += 1;
+    }
+
+    // Version/品項 match — highest priority
+    if (oVer && pVer) {
+      // Exact or substring match
+      if (oVer.indexOf(pVer) >= 0 || pVer.indexOf(oVer) >= 0) {
+        score += 10;
+      } else {
+        // Fuzzy: check if key parts match (e.g. "加成3個月" in "加成3個月 - 2次*1")
+        var pWords = pVer.replace(/[\/\-\*\s]+/g, ' ').split(' ').filter(function(w) { return w.length > 1; });
+        var matchedWords = pWords.filter(function(w) { return oVer.indexOf(w) >= 0; });
+        if (matchedWords.length > 0) score += matchedWords.length * 3;
       }
     }
+
+    if (score > bestScore) { bestScore = score; bestMatch = p; }
   });
-  return match ? match.cost : 0;
+  return bestMatch ? bestMatch.cost : 0;
 }
 
 function importOcrOrders() {
