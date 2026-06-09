@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="代儲管理">
-<meta name="theme-color" content="#0f1117">
-<title>代儲管理</title>
+<meta name="apple-mobile-web-app-title" content="貓玩聚">
+<meta name="theme-color" content="#ff6b00">
+<title>貓玩聚代儲</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='68' font-size='60' text-anchor='middle'>📦</text></svg>">
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
 <!-- Login -->
 <div id="loginPage" class="page">
   <div class="login-box">
-    <h1>📦 代儲管理系統</h1>
+    <h1><img src="icon.png" style="width:48px;height:48px;vertical-align:middle;border-radius:10px;margin-right:8px">貓玩聚代儲</h1>
     <p class="sub">管理你的代儲商品、訂單與利潤</p>
     <div class="form-group">
       <label>Email</label>
@@ -45,8 +45,8 @@
   <!-- Top Bar -->
   <header id="topBar">
     <div class="top-left">
-      <span class="logo">📦</span>
-      <span class="app-title">代儲管理</span>
+      <img src="icon.png" class="logo-img" alt="logo">
+      <span class="app-title">貓玩聚</span>
     </div>
     <div class="top-right">
       <span id="userLabel" class="user-label"></span>
@@ -407,6 +407,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

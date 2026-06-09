@@ -45,6 +45,7 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .btn.full{width:100%}
 .icon-btn{background:none;border:none;color:var(--fg2);font-size:1.1rem;cursor:pointer;padding:6px;border-radius:var(--radius-sm);transition:var(--transition)}
 .icon-btn:hover{color:var(--fg0);background:var(--bg3)}
+.logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover}
 
 /* Forms */
 .form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
