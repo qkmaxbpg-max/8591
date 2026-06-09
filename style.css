@@ -43,7 +43,7 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .btn.danger{background:var(--red);color:#fff}.btn.danger:hover{opacity:.85}
 .btn.sm{padding:5px 12px;font-size:.8rem}
 .btn.full{width:100%}
-.icon-btn{background:none;border:none;color:var(--fg2);font-size:1.1rem;cursor:pointer;padding:6px;border-radius:var(--radius-sm);transition:var(--transition)}
+.icon-btn{background:none;border:none;color:var(--fg2);font-size:1.3rem;cursor:pointer;padding:8px;border-radius:var(--radius-sm);transition:var(--transition);min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
 .icon-btn:hover{color:var(--fg0);background:var(--bg3)}
 .logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover}
 
@@ -55,7 +55,7 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
 /* Top Bar */
-#topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg1);border-bottom:1px solid var(--bg3);position:sticky;top:0;z-index:100}
+#topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;padding-top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--bg1);border-bottom:1px solid var(--bg3);position:sticky;top:0;z-index:100}
 .top-left{display:flex;align-items:center;gap:8px}
 .logo{font-size:1.3rem}
 .app-title{font-weight:700;font-size:1.1rem}
