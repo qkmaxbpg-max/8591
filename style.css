@@ -310,8 +310,22 @@ tr:hover td{background:var(--bg2)}
 .sub-card .sub-detail{font-size:.8rem;color:var(--fg2);margin-top:2px}
 .sub-card .sub-dates{font-size:.78rem;color:var(--fg3);margin-top:3px}
 .sub-card .sub-buyer{font-size:.8rem;color:var(--fg2);margin-top:2px}
+.sub-card .sub-account{font-size:.78rem;color:var(--accent);margin-top:2px;word-break:break-all}
+.sub-card .sub-notes{font-size:.75rem;color:var(--fg3);margin-top:2px;font-style:italic}
 
 .sub-card .sub-actions{display:flex;gap:6px}
+
+/* Subscription groups */
+.subs-group{margin-bottom:12px;background:var(--bg1);border-radius:var(--radius);overflow:hidden;border:1px solid var(--bg4)}
+.subs-group-head{display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;user-select:none;transition:var(--transition)}
+.subs-group-head:hover{background:var(--bg2)}
+.subs-group-arrow{font-size:.7rem;color:var(--fg2);transition:transform .2s}
+.subs-group.collapsed .subs-group-arrow{transform:rotate(-90deg)}
+.subs-group-name{font-weight:600;font-size:1rem}
+.subs-group-count{font-size:.8rem;color:var(--fg2);margin-left:auto}
+.subs-group-body{padding:0 8px 8px}
+.subs-group.collapsed .subs-group-body{display:none}
+.subs-group-body .sub-card{margin-bottom:6px}
 
 /* Dashboard expiry section */
 #dashExpiryCard .card-head{display:flex;justify-content:space-between;align-items:center}

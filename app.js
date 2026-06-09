@@ -815,6 +815,7 @@ function openOrderModal(item) {
   $('om_unitCost').value = item ? item.unit_cost : '';
   $('om_status').value = item ? item.status : '已完成';
   dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
+  $('om_accountInfo').value = item ? (item.account_info || '') : '';
   $('om_notes').value = item ? (item.notes || '') : '';
   $('om_manualName').value = item ? (item.platform || '') : '';
 
@@ -934,6 +935,7 @@ function saveOrder() {
     commission_type: ag ? ag.commission_type : '百分比',
     commission_value: ag ? ag.commission_value : 0,
     expiry_date: dpGetVal('om_expiry') || null,
+    account_info: $('om_accountInfo').value.trim(),
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
@@ -1299,7 +1301,6 @@ function saveSettings() {
 
 /* ──── Subscription Management ──── */
 function getSubscriptions() {
-  // Return all completed orders that have an expiry_date
   return orders.filter(function(o) {
     return o.expiry_date && o.status === '已完成';
   }).map(function(o) {
@@ -1318,7 +1319,9 @@ function getSubscriptions() {
       expiry_date: o.expiry_date,
       days_left: diff,
       unit_price: o.unit_price || 0,
-      qty: o.qty || 1
+      qty: o.qty || 1,
+      account_info: o.account_info || '',
+      notes: o.notes || ''
     };
   }).sort(function(a, b) { return a.days_left - b.days_left; });
 }
@@ -1337,7 +1340,7 @@ function renderSubscriptions() {
 
   if (q) {
     filtered = filtered.filter(function(s) {
-      return (s.platform + s.version + s.buyer + s.customer).toLowerCase().indexOf(q) >= 0;
+      return (s.platform + s.version + s.buyer + s.customer + s.account_info + s.notes).toLowerCase().indexOf(q) >= 0;
     });
   }
 
@@ -1355,32 +1358,67 @@ function renderSubscriptions() {
       '<div class="subs-stat"><div class="ss-val">' + expired + '</div><div class="ss-label">已過期</div></div>';
   }
 
-  // Cards
   if (filtered.length === 0) {
     $('subsList').innerHTML = '<div class="empty"><div class="icon">📅</div><p>沒有符合條件的訂閱</p></div>';
     return;
   }
 
-  var html = '';
+  // Group by platform
+  var groups = {};
   filtered.forEach(function(s) {
-    var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
-    var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
-    var daysText = s.days_left < 0 ? '已過期' : s.days_left === 0 ? '今天' : s.days_left + '天';
-    var who = s.customer || s.buyer || '';
-
-    html += '<div class="sub-card ' + cls + '">' +
-      '<div class="sub-countdown"><div class="days ' + daysCls + '">' + (s.days_left < 0 ? Math.abs(s.days_left) : s.days_left) + '</div>' +
-      '<div class="days-label">' + (s.days_left < 0 ? '天前到期' : s.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
-      '<div class="sub-info">' +
-        '<div class="sub-product">' + esc(s.platform) + (s.version ? ' ' + esc(s.version) : '') + '</div>' +
-        (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
-        '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + (s.duration ? '（' + esc(s.duration) + '）' : '') + '</div>' +
-      '</div>' +
-      '<div class="sub-actions">' +
-        '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
-      '</div>' +
-    '</div>';
+    var key = s.platform || '未分類';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
   });
+
+  var html = '';
+  // Sort groups: platforms with most urgent items first
+  var groupKeys = Object.keys(groups).sort(function(a, b) {
+    var minA = groups[a].reduce(function(m, s) { return Math.min(m, s.days_left); }, 9999);
+    var minB = groups[b].reduce(function(m, s) { return Math.min(m, s.days_left); }, 9999);
+    return minA - minB;
+  });
+
+  groupKeys.forEach(function(plat) {
+    var items = groups[plat];
+    var urgentCount = items.filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
+    var activeCount = items.filter(function(s) { return s.days_left >= 0; }).length;
+    var headerCls = urgentCount > 0 ? 'text-red' : '';
+
+    html += '<div class="subs-group">' +
+      '<div class="subs-group-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+        '<span class="subs-group-arrow">▼</span>' +
+        '<span class="subs-group-name">' + esc(plat) + '</span>' +
+        '<span class="subs-group-count">' + activeCount + ' 筆' +
+        (urgentCount > 0 ? ' <span class="' + headerCls + '">（' + urgentCount + ' 筆即將到期）</span>' : '') +
+        '</span>' +
+      '</div>' +
+      '<div class="subs-group-body">';
+
+    items.forEach(function(s) {
+      var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
+      var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
+      var who = s.customer || s.buyer || '';
+
+      html += '<div class="sub-card ' + cls + '">' +
+        '<div class="sub-countdown"><div class="days ' + daysCls + '">' + (s.days_left < 0 ? Math.abs(s.days_left) : s.days_left) + '</div>' +
+        '<div class="days-label">' + (s.days_left < 0 ? '天前到期' : s.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
+        '<div class="sub-info">' +
+          '<div class="sub-product">' + esc(s.version || s.platform) + (s.duration ? ' <span style="color:var(--fg2);font-weight:400">(' + esc(s.duration) + ')</span>' : '') + '</div>' +
+          (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
+          (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
+          '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + '</div>' +
+          (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
+        '</div>' +
+        '<div class="sub-actions">' +
+          '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
+        '</div>' +
+      '</div>';
+    });
+
+    html += '</div></div>';
+  });
+
   $('subsList').innerHTML = html;
 }
 
