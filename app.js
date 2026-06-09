@@ -618,8 +618,9 @@ function updateProdPreview() {
     '<div class="row"><span class="lbl">個人 淨利</span><span class="val text-green highlight">NT$' + fmtN(profPersonal) + '</span></div>';
 }
 function editProduct(id) {
-  var item = products.filter(function(p) { return p.id === id })[0];
+  var item = products.filter(function(p) { return String(p.id) === String(id) })[0];
   if (item) openProductModal(item);
+  else toast('找不到此商品', 'err');
 }
 function saveProduct() {
   var obj = {
@@ -638,7 +639,7 @@ function saveProduct() {
   var id = $('pm_id').value;
   if (isDemo) {
     if (id) {
-      var idx = products.findIndex(function(p) { return p.id === id });
+      var idx = products.findIndex(function(p) { return String(p.id) === String(id) });
       if (idx >= 0) Object.assign(products[idx], obj);
     } else {
       obj.id = 'd' + Date.now();
@@ -660,7 +661,7 @@ function saveProduct() {
 function deleteProduct(id) {
   confirmAction('確定要刪除此商品？', function() {
     if (isDemo) {
-      products = products.filter(function(p) { return p.id !== id });
+      products = products.filter(function(p) { return String(p.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
       sb.from('products').delete().eq('id', id).then(function(res) {
@@ -728,12 +729,12 @@ function renderOrders() {
 }
 function getAgentName(id) {
   if (!id) return '';
-  var a = agents.filter(function(x) { return x.id === id })[0];
+  var a = agents.filter(function(x) { return String(x.id) === String(id) })[0];
   return a ? a.name : '';
 }
 function getCustomerName(id) {
   if (!id) return '';
-  var c = customers.filter(function(x) { return x.id === id })[0];
+  var c = customers.filter(function(x) { return String(x.id) === String(id) })[0];
   return c ? c.name : '';
 }
 function onChannelChange() {
@@ -879,8 +880,9 @@ function calcOrderPreview() {
     '<div class="row"><span class="lbl">最終利潤</span><span class="val ' + cls + ' highlight">NT$' + fmtN(profit) + '</span></div>';
 }
 function editOrder(id) {
-  var item = orders.filter(function(o) { return o.id === id })[0];
+  var item = orders.filter(function(o) { return String(o.id) === String(id) })[0];
   if (item) openOrderModal(item);
+  else toast('找不到此訂單', 'err');
 }
 function resolveCustomer(name, callback) {
   // Find existing customer by name, or auto-create a new one
@@ -942,7 +944,7 @@ function saveOrder() {
   if (ch === '個人' && $('om_personalSelect').value === '__custom__' && manualName) addPersonalPreset(manualName);
 
   var id = $('om_id').value;
-  if (id) obj.order_no = orders.filter(function(o) { return o.id === id })[0].order_no;
+  if (id) obj.order_no = orders.filter(function(o) { return String(o.id) === String(id) })[0].order_no;
 
   // Resolve customer name → id (auto-create if new), then save order
   resolveCustomer(custName, function(custId) {
@@ -954,7 +956,7 @@ function saveOrder() {
 function _doSaveOrder(obj, id) {
   if (isDemo) {
     if (id) {
-      var idx = orders.findIndex(function(o) { return o.id === id });
+      var idx = orders.findIndex(function(o) { return String(o.id) === String(id) });
       if (idx >= 0) Object.assign(orders[idx], obj);
     } else {
       obj.id = 'd' + Date.now();
@@ -975,7 +977,7 @@ function _doSaveOrder(obj, id) {
 function deleteOrder(id) {
   confirmAction('確定要刪除此訂單？', function() {
     if (isDemo) {
-      orders = orders.filter(function(o) { return o.id !== id });
+      orders = orders.filter(function(o) { return String(o.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
       sb.from('orders').delete().eq('id', id).then(function(res) {
@@ -1020,8 +1022,9 @@ function openAgentModal(item) {
   openModal('agentModal');
 }
 function editAgent(id) {
-  var item = agents.filter(function(a) { return a.id === id })[0];
+  var item = agents.filter(function(a) { return String(a.id) === String(id) })[0];
   if (item) openAgentModal(item);
+  else toast('找不到此出單人', 'err');
 }
 function saveAgent() {
   var obj = {
@@ -1034,7 +1037,7 @@ function saveAgent() {
   var id = $('am_id').value;
   if (isDemo) {
     if (id) {
-      var idx = agents.findIndex(function(a) { return a.id === id });
+      var idx = agents.findIndex(function(a) { return String(a.id) === String(id) });
       if (idx >= 0) Object.assign(agents[idx], obj);
     } else {
       obj.id = 'd' + Date.now();
@@ -1055,7 +1058,7 @@ function saveAgent() {
 function deleteAgent(id) {
   confirmAction('確定要刪除此出單人？', function() {
     if (isDemo) {
-      agents = agents.filter(function(a) { return a.id !== id });
+      agents = agents.filter(function(a) { return String(a.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
       sb.from('agents').delete().eq('id', id).then(function(res) {
@@ -1103,8 +1106,9 @@ function openCustomerModal(item) {
   openModal('customerModal');
 }
 function editCustomer(id) {
-  var item = customers.filter(function(c) { return c.id === id })[0];
+  var item = customers.filter(function(c) { return String(c.id) === String(id) })[0];
   if (item) openCustomerModal(item);
+  else toast('找不到此客戶', 'err');
 }
 function saveCustomer() {
   var obj = {
@@ -1117,7 +1121,7 @@ function saveCustomer() {
   var id = $('cm_id').value;
   if (isDemo) {
     if (id) {
-      var idx = customers.findIndex(function(c) { return c.id === id });
+      var idx = customers.findIndex(function(c) { return String(c.id) === String(id) });
       if (idx >= 0) Object.assign(customers[idx], obj);
     } else {
       obj.id = 'd' + Date.now();
@@ -1138,7 +1142,7 @@ function saveCustomer() {
 function deleteCustomer(id) {
   confirmAction('確定要刪除此客戶？', function() {
     if (isDemo) {
-      customers = customers.filter(function(c) { return c.id !== id });
+      customers = customers.filter(function(c) { return String(c.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
       sb.from('customers').delete().eq('id', id).then(function(res) {
@@ -1203,8 +1207,9 @@ function openExpModal(item) {
   openModal('expModal');
 }
 function editExp(id) {
-  var item = ads.filter(function(a) { return a.id === id })[0];
+  var item = ads.filter(function(a) { return String(a.id) === String(id) })[0];
   if (item) openExpModal(item);
+  else toast('找不到此記錄', 'err');
 }
 function saveExp() {
   var obj = {
@@ -1217,7 +1222,7 @@ function saveExp() {
   var id = $('exp_id').value;
   if (isDemo) {
     if (id) {
-      var idx = ads.findIndex(function(a) { return a.id === id });
+      var idx = ads.findIndex(function(a) { return String(a.id) === String(id) });
       if (idx >= 0) Object.assign(ads[idx], obj);
     } else {
       obj.id = 'd' + Date.now();
@@ -1240,7 +1245,7 @@ function saveExp() {
 function deleteExp(id) {
   confirmAction('確定要刪除此廣告記錄？', function() {
     if (isDemo) {
-      ads = ads.filter(function(a) { return a.id !== id });
+      ads = ads.filter(function(a) { return String(a.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
       sb.from('ad_spends').delete().eq('id', id).then(function(res) {
