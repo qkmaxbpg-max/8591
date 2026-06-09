@@ -166,6 +166,8 @@ function renderAll() {
   renderAgents();
   renderCustomers();
   renderAds();
+  renderSubscriptions();
+  checkExpiryNotifications();
 }
 
 /* ──── Tab switching ──── */
@@ -508,6 +510,9 @@ function renderDashboard() {
     });
     $('recentOrders').innerHTML = h + '</table>';
   }
+
+  // Dashboard expiry section
+  renderDashboardExpiry();
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
@@ -1250,6 +1255,179 @@ function saveSettings() {
   else localStorage.removeItem('proxy-api-key');
   closeModal();
   toast('設定已儲存', 'ok');
+}
+
+/* ──── Subscription Management ──── */
+function getSubscriptions() {
+  // Return all completed orders that have an expiry_date
+  return orders.filter(function(o) {
+    return o.expiry_date && o.status === '已完成';
+  }).map(function(o) {
+    var now = new Date(); now.setHours(0,0,0,0);
+    var exp = new Date(o.expiry_date); exp.setHours(0,0,0,0);
+    var diff = Math.ceil((exp - now) / 86400000);
+    return {
+      id: o.id,
+      platform: o.platform || '',
+      version: o.version || '',
+      duration: o.duration || '',
+      buyer: o.notes ? (o.notes.match(/買家(No\.\d+)/)||[])[1] || '' : '',
+      customer: getCustomerName(o.customer_id),
+      channel: o.channel || '8591',
+      order_date: o.order_date || '',
+      expiry_date: o.expiry_date,
+      days_left: diff,
+      unit_price: o.unit_price || 0,
+      qty: o.qty || 1
+    };
+  }).sort(function(a, b) { return a.days_left - b.days_left; });
+}
+
+function renderSubscriptions() {
+  var subs = getSubscriptions();
+  var filter = $('subsFilter') ? $('subsFilter').value : 'active';
+  var q = ($('subsSearch') ? $('subsSearch').value : '').toLowerCase();
+
+  var filtered = subs.filter(function(s) {
+    if (filter === 'active') return s.days_left >= 0;
+    if (filter === 'expiring') return s.days_left >= 0 && s.days_left <= 7;
+    if (filter === 'expired') return s.days_left < 0;
+    return true;
+  });
+
+  if (q) {
+    filtered = filtered.filter(function(s) {
+      return (s.platform + s.version + s.buyer + s.customer).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  // Summary stats
+  var totalActive = subs.filter(function(s) { return s.days_left >= 0; }).length;
+  var urgent = subs.filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
+  var warning = subs.filter(function(s) { return s.days_left > 2 && s.days_left <= 7; }).length;
+  var expired = subs.filter(function(s) { return s.days_left < 0; }).length;
+
+  if ($('subsSummary')) {
+    $('subsSummary').innerHTML =
+      '<div class="subs-stat safe"><div class="ss-val">' + totalActive + '</div><div class="ss-label">進行中</div></div>' +
+      '<div class="subs-stat urgent"><div class="ss-val">' + urgent + '</div><div class="ss-label">2天內到期</div></div>' +
+      '<div class="subs-stat warning"><div class="ss-val">' + warning + '</div><div class="ss-label">7天內到期</div></div>' +
+      '<div class="subs-stat"><div class="ss-val">' + expired + '</div><div class="ss-label">已過期</div></div>';
+  }
+
+  // Cards
+  if (filtered.length === 0) {
+    $('subsList').innerHTML = '<div class="empty"><div class="icon">📅</div><p>沒有符合條件的訂閱</p></div>';
+    return;
+  }
+
+  var html = '';
+  filtered.forEach(function(s) {
+    var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
+    var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
+    var daysText = s.days_left < 0 ? '已過期' : s.days_left === 0 ? '今天' : s.days_left + '天';
+    var who = s.customer || s.buyer || '';
+
+    html += '<div class="sub-card ' + cls + '">' +
+      '<div class="sub-countdown"><div class="days ' + daysCls + '">' + (s.days_left < 0 ? Math.abs(s.days_left) : s.days_left) + '</div>' +
+      '<div class="days-label">' + (s.days_left < 0 ? '天前到期' : s.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
+      '<div class="sub-info">' +
+        '<div class="sub-product">' + esc(s.platform) + (s.version ? ' ' + esc(s.version) : '') + '</div>' +
+        (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
+        '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + (s.duration ? '（' + esc(s.duration) + '）' : '') + '</div>' +
+      '</div>' +
+      '<div class="sub-actions">' +
+        '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
+      '</div>' +
+    '</div>';
+  });
+  $('subsList').innerHTML = html;
+}
+
+function renderDashboardExpiry() {
+  var subs = getSubscriptions().filter(function(s) { return s.days_left >= 0 && s.days_left <= 7; });
+
+  if (!$('dashExpiry')) return;
+
+  if (subs.length === 0) {
+    $('dashExpiryCard').style.display = 'none';
+    return;
+  }
+  $('dashExpiryCard').style.display = '';
+
+  var html = '';
+  subs.slice(0, 5).forEach(function(s) {
+    var daysCls = s.days_left <= 2 ? 'text-red' : 'text-yellow';
+    var daysText = s.days_left === 0 ? '今天' : s.days_left + '天';
+    var who = s.customer || s.buyer || '';
+    html += '<div class="dash-expiry-item">' +
+      '<div class="de-days ' + daysCls + '">' + daysText + '</div>' +
+      '<div class="de-info">' +
+        '<div class="de-product">' + esc(s.platform) + (s.version ? ' ' + esc(s.version) : '') + '</div>' +
+        (who ? '<div class="de-buyer">👤 ' + esc(who) + '</div>' : '') +
+      '</div>' +
+      '<div class="de-expiry">' + s.expiry_date + '</div>' +
+    '</div>';
+  });
+  if (subs.length > 5) {
+    html += '<div style="text-align:center;padding:8px;color:var(--fg2);font-size:.8rem">還有 ' + (subs.length - 5) + ' 筆即將到期...</div>';
+  }
+  $('dashExpiry').innerHTML = html;
+}
+
+function checkExpiryNotifications() {
+  var subs = getSubscriptions().filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; });
+
+  // Show/hide alert bar
+  var bar = $('expiryAlertBar');
+  if (!bar) return;
+
+  if (subs.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  var names = subs.slice(0, 3).map(function(s) {
+    var who = s.customer || s.buyer || '';
+    return esc(s.platform) + (who ? '(' + esc(who) + ')' : '');
+  }).join('、');
+  if (subs.length > 3) names += ' 等';
+
+  bar.style.display = 'flex';
+  bar.innerHTML = '<span class="alert-icon">⚠️</span>' +
+    '<span class="alert-text"><strong>' + subs.length + ' 筆訂閱即將到期：</strong>' + names + '</span>' +
+    '<button class="alert-btn" onclick="switchTab(\'subs\')">查看</button>' +
+    '<button class="alert-dismiss" onclick="this.parentElement.style.display=\'none\'">&times;</button>';
+
+  // Browser notification (once per session)
+  if (window._expiryNotified) return;
+  window._expiryNotified = true;
+
+  if ('Notification' in window) {
+    if (Notification.permission === 'granted') {
+      sendExpiryNotification(subs);
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(function(p) {
+        if (p === 'granted') sendExpiryNotification(subs);
+      });
+    }
+  }
+}
+
+function sendExpiryNotification(subs) {
+  var body = subs.map(function(s) {
+    var who = s.customer || s.buyer || '';
+    var d = s.days_left === 0 ? '今天到期' : s.days_left + '天後到期';
+    return s.platform + (who ? '(' + who + ')' : '') + ' — ' + d;
+  }).join('\n');
+
+  try {
+    new Notification('⚠️ 訂閱即將到期', {
+      body: body,
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⏰</text></svg>',
+      tag: 'expiry-alert'
+    });
+  } catch(e) { console.warn('Notification error:', e); }
 }
 
 /* ──── OCR Screenshot Import ──── */

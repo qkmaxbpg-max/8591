@@ -272,3 +272,54 @@ tr:hover td{background:var(--bg2)}
 .ocr-summary .sum-item .sum-label{font-size:.75rem;color:var(--fg2)}
 .ocr-summary .sum-item .sum-val{font-size:1.1rem;font-weight:600;color:var(--fg0)}
 
+/* Expiry Alert Bar */
+.expiry-alert-bar{background:var(--red-dim);border:1px solid var(--red);border-radius:var(--radius-sm);padding:10px 16px;margin:0 16px 12px;display:flex;align-items:center;gap:10px;font-size:.9rem;color:var(--fg0);animation:alertPulse 2s ease-in-out infinite}
+.expiry-alert-bar .alert-icon{font-size:1.3rem}
+.expiry-alert-bar .alert-text{flex:1}
+.expiry-alert-bar .alert-text strong{color:var(--red)}
+.expiry-alert-bar .alert-btn{padding:4px 12px;background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:.8rem;white-space:nowrap}
+.expiry-alert-bar .alert-dismiss{background:none;border:none;color:var(--fg2);cursor:pointer;font-size:1.1rem;padding:4px}
+@keyframes alertPulse{0%,100%{opacity:1}50%{opacity:.85}}
+
+/* Subscription Tab */
+.subs-summary{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.subs-stat{background:var(--bg1);border-radius:var(--radius-sm);padding:12px 18px;flex:1;min-width:120px;text-align:center;border:1px solid var(--bg4)}
+.subs-stat .ss-val{font-size:1.4rem;font-weight:700;margin-bottom:2px}
+.subs-stat .ss-label{font-size:.75rem;color:var(--fg2)}
+.subs-stat.urgent .ss-val{color:var(--red)}
+.subs-stat.warning .ss-val{color:var(--yellow)}
+.subs-stat.safe .ss-val{color:var(--green)}
+
+.subs-grid{display:flex;flex-direction:column;gap:8px}
+.sub-card{background:var(--bg1);border-radius:var(--radius);padding:14px 16px;border-left:4px solid var(--green);display:flex;align-items:center;gap:14px;transition:var(--transition)}
+.sub-card:hover{background:var(--bg2)}
+.sub-card.urgent{border-left-color:var(--red);background:var(--red-dim)}
+.sub-card.warning{border-left-color:var(--yellow);background:var(--yellow-dim)}
+.sub-card.expired{border-left-color:var(--fg3);opacity:.65}
+
+.sub-card .sub-countdown{min-width:64px;text-align:center}
+.sub-card .sub-countdown .days{font-size:1.6rem;font-weight:700;line-height:1}
+.sub-card .sub-countdown .days-label{font-size:.7rem;color:var(--fg2)}
+.sub-card .sub-countdown .days.text-red{color:var(--red)}
+.sub-card .sub-countdown .days.text-yellow{color:var(--yellow)}
+.sub-card .sub-countdown .days.text-green{color:var(--green)}
+.sub-card .sub-countdown .days.text-grey{color:var(--fg3)}
+
+.sub-card .sub-info{flex:1}
+.sub-card .sub-product{font-weight:600;font-size:.95rem}
+.sub-card .sub-detail{font-size:.8rem;color:var(--fg2);margin-top:2px}
+.sub-card .sub-dates{font-size:.78rem;color:var(--fg3);margin-top:3px}
+.sub-card .sub-buyer{font-size:.8rem;color:var(--fg2);margin-top:2px}
+
+.sub-card .sub-actions{display:flex;gap:6px}
+
+/* Dashboard expiry section */
+#dashExpiryCard .card-head{display:flex;justify-content:space-between;align-items:center}
+.dash-expiry-item{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--bg3)}
+.dash-expiry-item:last-child{border-bottom:none}
+.dash-expiry-item .de-days{min-width:50px;text-align:center;font-weight:700;font-size:1.1rem}
+.dash-expiry-item .de-info{flex:1}
+.dash-expiry-item .de-product{font-weight:500;font-size:.9rem}
+.dash-expiry-item .de-buyer{font-size:.8rem;color:var(--fg2)}
+.dash-expiry-item .de-expiry{font-size:.8rem;color:var(--fg2);white-space:nowrap}
+
