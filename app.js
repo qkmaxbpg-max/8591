@@ -779,12 +779,19 @@ function openOrderModal(item) {
   });
   $('om_agent').innerHTML = agHtml;
 
-  var cuHtml = '<option value="">（無）</option>';
+  // Customer datalist (can type new name or pick existing)
+  var cuHtml = '';
   customers.forEach(function(c) {
-    var sel = item && item.customer_id === c.id ? ' selected' : '';
-    cuHtml += '<option value="' + c.id + '"' + sel + '>' + esc(c.name) + '</option>';
+    cuHtml += '<option value="' + esc(c.name) + '">';
   });
-  $('om_customer').innerHTML = cuHtml;
+  $('customerList').innerHTML = cuHtml;
+  // Set current value
+  if (item && item.customer_id) {
+    var cust = customers.filter(function(c) { return c.id === item.customer_id })[0];
+    $('om_customer').value = cust ? cust.name : '';
+  } else {
+    $('om_customer').value = '';
+  }
 
   // Product dropdown grouped by platform
   var prHtml = '<option value="">— 選擇商品 —</option>';
@@ -874,6 +881,31 @@ function editOrder(id) {
   var item = orders.filter(function(o) { return o.id === id })[0];
   if (item) openOrderModal(item);
 }
+function resolveCustomer(name, callback) {
+  // Find existing customer by name, or auto-create a new one
+  if (!name) return callback(null);
+  var existing = customers.filter(function(c) { return c.name === name })[0];
+  if (existing) return callback(existing.id);
+
+  // Auto-create new customer
+  if (isDemo) {
+    var nc = { id: 'd' + Date.now(), name: name, contact: '', platform: '', notes: '自動建立' };
+    customers.push(nc);
+    demoSave();
+    toast('已自動新增客戶「' + name + '」', 'ok');
+    return callback(nc.id);
+  }
+
+  sb.from('customers').insert({ user_id: userId, name: name, contact: '', platform: '', notes: '自動建立' })
+    .select().then(function(res) {
+      if (res.error) { toast('建立客戶失敗：' + res.error.message, 'err'); return callback(null); }
+      var nc = res.data[0];
+      customers.push(nc);
+      toast('已自動新增客戶「' + name + '」', 'ok');
+      callback(nc.id);
+    });
+}
+
 function saveOrder() {
   var pid = $('om_product').value;
   var p = products.filter(function(x) { return x.id === pid })[0];
@@ -881,12 +913,13 @@ function saveOrder() {
   var ag = agents.filter(function(x) { return x.id === agId })[0];
   var ch = $('om_channel').value;
   var manualName = $('om_manualName').value.trim();
+  var custName = $('om_customer').value.trim();
 
   var obj = {
     order_date: dpGetVal('om_date'),
     order_no: genOrderNo(),
     agent_id: agId,
-    customer_id: $('om_customer').value || null,
+    customer_id: null, // will be set by resolveCustomer
     channel: ch,
     status: $('om_status').value,
     product_id: pid || null,
@@ -904,12 +937,19 @@ function saveOrder() {
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
-  // Auto-remember custom personal channel product names
   if (ch === '個人' && $('om_personalSelect').value === '__custom__' && manualName) addPersonalPreset(manualName);
 
   var id = $('om_id').value;
   if (id) obj.order_no = orders.filter(function(o) { return o.id === id })[0].order_no;
 
+  // Resolve customer name → id (auto-create if new), then save order
+  resolveCustomer(custName, function(custId) {
+    obj.customer_id = custId;
+    _doSaveOrder(obj, id);
+  });
+}
+
+function _doSaveOrder(obj, id) {
   if (isDemo) {
     if (id) {
       var idx = orders.findIndex(function(o) { return o.id === id });
