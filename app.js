@@ -775,7 +775,7 @@ function openOrderModal(item) {
 
   var agHtml = '<option value="">（自己）</option>';
   agents.forEach(function(a) {
-    var sel = item && item.agent_id === a.id ? ' selected' : '';
+    var sel = item && String(item.agent_id) === String(a.id) ? ' selected' : '';
     agHtml += '<option value="' + a.id + '"' + sel + '>' + esc(a.name) + '</option>';
   });
   $('om_agent').innerHTML = agHtml;
@@ -788,7 +788,7 @@ function openOrderModal(item) {
   $('customerList').innerHTML = cuHtml;
   // Set current value
   if (item && item.customer_id) {
-    var cust = customers.filter(function(c) { return c.id === item.customer_id })[0];
+    var cust = customers.filter(function(c) { return String(c.id) === String(item.customer_id) })[0];
     $('om_customer').value = cust ? cust.name : '';
   } else {
     $('om_customer').value = '';
@@ -804,7 +804,7 @@ function openOrderModal(item) {
   Object.keys(grouped).sort().forEach(function(plat) {
     prHtml += '<optgroup label="' + esc(plat) + '">';
     grouped[plat].forEach(function(p) {
-      var sel = item && item.product_id === p.id ? ' selected' : '';
+      var sel = item && String(item.product_id) === String(p.id) ? ' selected' : '';
       prHtml += '<option value="' + p.id + '"' + sel + '>' + esc(p.version) + ' ' + esc(p.duration) + ' | NT$' + fmtN(p.price) + '</option>';
     });
     prHtml += '</optgroup>';
@@ -839,7 +839,7 @@ function openOrderModal(item) {
 }
 function onProductSelect() {
   var pid = $('om_product').value;
-  var p = products.filter(function(x) { return x.id === pid })[0];
+  var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
   if (p) {
     $('om_unitPrice').value = p.price;
     $('om_unitCost').value = p.cost;
@@ -864,7 +864,7 @@ function calcOrderPreview() {
   var gross = totalRev - totalCost - fee;
 
   var agId = $('om_agent').value;
-  var ag = agents.filter(function(x) { return x.id === agId })[0];
+  var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var commType = ag ? ag.commission_type : '百分比';
   var commVal = ag ? ag.commission_value : 0;
   var comm = calcCommission(gross, commType, commVal);
@@ -881,8 +881,11 @@ function calcOrderPreview() {
 }
 function editOrder(id) {
   var item = orders.filter(function(o) { return String(o.id) === String(id) })[0];
-  if (item) openOrderModal(item);
-  else toast('找不到此訂單', 'err');
+  if (item) {
+    try { openOrderModal(item); }
+    catch(e) { toast('開啟編輯失敗：' + e.message, 'err'); console.error('editOrder error:', e) }
+  }
+  else toast('找不到此訂單 (id=' + id + ', 共' + orders.length + '筆)', 'err');
 }
 function resolveCustomer(name, callback) {
   // Find existing customer by name, or auto-create a new one
@@ -911,9 +914,9 @@ function resolveCustomer(name, callback) {
 
 function saveOrder() {
   var pid = $('om_product').value;
-  var p = products.filter(function(x) { return x.id === pid })[0];
+  var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
   var agId = $('om_agent').value || null;
-  var ag = agents.filter(function(x) { return x.id === agId })[0];
+  var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var ch = $('om_channel').value;
   var manualName = $('om_manualName').value.trim();
   var custName = $('om_customer').value.trim();
