@@ -821,7 +821,7 @@ function openOrderModal(item) {
   $('om_manualName').value = item ? (item.platform || '') : '';
 
   // Set personal select when editing a personal-channel order
-  if (item && (item.channel || '8591') === '個人' && !pid) {
+  if (item && (item.channel || '8591') === '個人' && !item.product_id) {
     var presets = getPersonalPresets();
     var editName = item.platform || '';
     if (presets.indexOf(editName) >= 0) {
@@ -972,7 +972,19 @@ function _doSaveOrder(obj, id) {
       ? sb.from('orders').update(obj).eq('id', id)
       : sb.from('orders').insert(obj);
     req.then(function(res) {
-      if (res.error) return toast(res.error.message, 'err');
+      if (res.error) {
+        // If account_info column doesn't exist yet, retry without it
+        if (res.error.message && res.error.message.indexOf('account_info') >= 0) {
+          var obj2 = Object.assign({}, obj); delete obj2.account_info;
+          var req2 = id ? sb.from('orders').update(obj2).eq('id', id) : sb.from('orders').insert(obj2);
+          req2.then(function(r2) {
+            if (r2.error) return toast(r2.error.message, 'err');
+            closeModal(); loadAll(); toast('訂單已儲存（請新增 account_info 欄位）', 'ok');
+          });
+          return;
+        }
+        return toast(res.error.message, 'err');
+      }
       closeModal(); loadAll(); toast('訂單已儲存', 'ok');
     });
   }
