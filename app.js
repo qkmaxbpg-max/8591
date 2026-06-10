@@ -1291,6 +1291,34 @@ function doRefresh() {
   location.reload(true);
 }
 
+/* ──── Filter Tags ──── */
+function setFilter(el, selectId) {
+  // Update hidden select value
+  var val = el.getAttribute('data-value');
+  var sel = $(selectId);
+  if (sel) {
+    sel.value = val;
+    // For selects that need the option to exist
+    if (!sel.querySelector('option[value="' + val + '"]')) {
+      sel.innerHTML = '<option value="' + val + '"></option>';
+    }
+    sel.value = val;
+  }
+  // Toggle active state within same filter group
+  var filterType = el.getAttribute('data-filter');
+  var container = el.parentElement;
+  var siblings = container.querySelectorAll('.filter-tag' + (filterType ? '[data-filter="' + filterType + '"]' : ''));
+  // If no data-filter attr, toggle all tags in container that share same selectId onclick
+  if (!filterType) {
+    siblings = container.querySelectorAll('.filter-tag[onclick*="' + selectId + '"]');
+  }
+  for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+  el.classList.add('active');
+  // Trigger render
+  if (selectId === 'orderChannelFilter' || selectId === 'orderStatusFilter') renderOrders();
+  else if (selectId === 'subsFilter') renderSubscriptions();
+}
+
 /* ──── Global Event Delegation ──── */
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-action]');

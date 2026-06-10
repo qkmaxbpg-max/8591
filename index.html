@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 
@@ -96,23 +96,24 @@
   <!-- Orders -->
   <section id="tab-orders" class="tab-content">
     <div class="toolbar">
-      <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
-      <button class="btn accent" onclick="openImportModal()">⚡ 快速匯入</button>
-      <div class="search-group">
-        <input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()">
-        <select id="orderChannelFilter" onchange="renderOrders()">
-          <option value="">全部管道</option>
-          <option value="8591">8591</option>
-          <option value="個人">個人</option>
-        </select>
-        <select id="orderStatusFilter" onchange="renderOrders()">
-          <option value="">全部狀態</option>
-          <option value="處理中">處理中</option>
-          <option value="已完成">已完成</option>
-          <option value="已取消">已取消</option>
-          <option value="已退款">已退款</option>
-        </select>
+      <div class="toolbar-top">
+        <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
+        <button class="btn accent" onclick="openImportModal()">⚡ 快速匯入</button>
+        <div class="search-box"><input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()"></div>
       </div>
+      <div class="filter-tags" id="orderFilters">
+        <span class="filter-tag active" data-filter="channel" data-value="" onclick="setFilter(this,'orderChannelFilter')">全部管道</span>
+        <span class="filter-tag" data-filter="channel" data-value="8591" onclick="setFilter(this,'orderChannelFilter')">8591</span>
+        <span class="filter-tag" data-filter="channel" data-value="個人" onclick="setFilter(this,'orderChannelFilter')">個人</span>
+        <span style="width:1px;background:var(--bg4);margin:0 4px"></span>
+        <span class="filter-tag active" data-filter="status" data-value="" onclick="setFilter(this,'orderStatusFilter')">全部狀態</span>
+        <span class="filter-tag" data-filter="status" data-value="處理中" onclick="setFilter(this,'orderStatusFilter')">處理中</span>
+        <span class="filter-tag" data-filter="status" data-value="已完成" onclick="setFilter(this,'orderStatusFilter')">已完成</span>
+        <span class="filter-tag" data-filter="status" data-value="已取消" onclick="setFilter(this,'orderStatusFilter')">已取消</span>
+        <span class="filter-tag" data-filter="status" data-value="已退款" onclick="setFilter(this,'orderStatusFilter')">已退款</span>
+      </div>
+      <select id="orderChannelFilter" style="display:none"><option value=""></option></select>
+      <select id="orderStatusFilter" style="display:none"><option value=""></option></select>
     </div>
     <div id="mpOrders" class="month-picker-bar" data-target="orders"></div>
     <div id="orderList" class="table-wrap"></div>
@@ -121,8 +122,10 @@
   <!-- Products -->
   <section id="tab-products" class="tab-content">
     <div class="toolbar">
-      <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
-      <input id="prodSearch" type="text" placeholder="搜尋商品..." oninput="renderProducts()">
+      <div class="toolbar-top">
+        <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
+        <div class="search-box"><input id="prodSearch" type="text" placeholder="搜尋商品..." oninput="renderProducts()"></div>
+      </div>
     </div>
     <div id="productList"></div>
   </section>
@@ -138,8 +141,10 @@
   <!-- Customers -->
   <section id="tab-customers" class="tab-content">
     <div class="toolbar">
-      <button class="btn primary" onclick="openCustomerModal()">＋ 新增客戶</button>
-      <input id="custSearch" type="text" placeholder="搜尋客戶..." oninput="renderCustomers()">
+      <div class="toolbar-top">
+        <button class="btn primary" onclick="openCustomerModal()">＋ 新增客戶</button>
+        <div class="search-box"><input id="custSearch" type="text" placeholder="搜尋客戶..." oninput="renderCustomers()"></div>
+      </div>
     </div>
     <div id="customerList" class="table-wrap"></div>
   </section>
@@ -147,13 +152,16 @@
   <!-- Subscriptions -->
   <section id="tab-subs" class="tab-content">
     <div class="toolbar">
-      <select id="subsFilter" onchange="renderSubscriptions()">
-        <option value="active">進行中</option>
-        <option value="expiring">即將到期（7天內）</option>
-        <option value="expired">已過期</option>
-        <option value="all">全部</option>
-      </select>
-      <input id="subsSearch" type="text" placeholder="搜尋訂閱..." oninput="renderSubscriptions()">
+      <div class="toolbar-top">
+        <div class="search-box"><input id="subsSearch" type="text" placeholder="搜尋訂閱..." oninput="renderSubscriptions()"></div>
+      </div>
+      <div class="filter-tags">
+        <span class="filter-tag active" data-value="active" onclick="setFilter(this,'subsFilter')">進行中</span>
+        <span class="filter-tag" data-value="expiring" onclick="setFilter(this,'subsFilter')">即將到期</span>
+        <span class="filter-tag" data-value="expired" onclick="setFilter(this,'subsFilter')">已過期</span>
+        <span class="filter-tag" data-value="all" onclick="setFilter(this,'subsFilter')">全部</span>
+      </div>
+      <select id="subsFilter" style="display:none"><option value="active"></option></select>
     </div>
     <div class="subs-summary" id="subsSummary"></div>
     <div id="subsList" class="subs-grid"></div>
@@ -407,6 +415,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>
