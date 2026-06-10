@@ -780,12 +780,18 @@ function openOrderModal(item) {
   });
   $('om_agent').innerHTML = agHtml;
 
-  // Customer datalist (can type new name or pick existing)
-  var cuHtml = '';
-  customers.forEach(function(c) {
-    cuHtml += '<option value="' + esc(c.name) + '">';
+  // Customer datalist — sort by order count for quick selection
+  var cuSorted = customers.slice().sort(function(a, b) {
+    var aOrds = orders.filter(function(o) { return String(o.customer_id) === String(a.id) }).length;
+    var bOrds = orders.filter(function(o) { return String(o.customer_id) === String(b.id) }).length;
+    return bOrds - aOrds;
   });
-  $('customerList').innerHTML = cuHtml;
+  var cuHtml = '';
+  cuSorted.forEach(function(c) {
+    var cnt = orders.filter(function(o) { return String(o.customer_id) === String(c.id) }).length;
+    cuHtml += '<option value="' + esc(c.name) + '">' + esc(c.name) + (cnt > 0 ? ' (' + cnt + '筆)' : '') + '</option>';
+  });
+  $('custDatList').innerHTML = cuHtml;
   // Set current value
   if (item && item.customer_id) {
     var cust = customers.filter(function(c) { return String(c.id) === String(item.customer_id) })[0];
@@ -1091,17 +1097,25 @@ function renderCustomers() {
     if (!q) return true;
     return (c.name + c.contact + c.platform + c.notes).toLowerCase().indexOf(q) >= 0;
   });
+  // Calculate order stats for each customer
+  list.forEach(function(c) {
+    var custOrders = orders.filter(function(o) { return String(o.customer_id) === String(c.id) });
+    c._orderCount = custOrders.length;
+    c._totalSpend = 0;
+    custOrders.forEach(function(o) { c._totalSpend += (o.qty || 1) * (o.unit_price || 0) });
+  });
+  // Sort by order count desc, then total spend desc
+  list.sort(function(a, b) { return b._orderCount - a._orderCount || b._totalSpend - a._totalSpend });
   if (list.length === 0) {
     $('customerList').innerHTML = '<div class="empty"><div class="icon">🧑‍💼</div><p>尚無客戶，點擊上方新增</p></div>';
     return;
   }
   var h = '<table><tr><th>名稱</th><th>聯絡方式</th><th>來源平台</th><th>訂單數</th><th class="text-right">消費總額</th><th>備註</th><th>操作</th></tr>';
   list.forEach(function(c) {
-    var custOrders = orders.filter(function(o) { return o.customer_id === c.id });
-    var total = 0;
-    custOrders.forEach(function(o) { total += (o.qty || 1) * (o.unit_price || 0) });
+    var custOrders = c._orderCount;
+    var total = c._totalSpend;
     h += '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.contact || '') + '</td><td>' + esc(c.platform || '') + '</td>' +
-      '<td class="text-center">' + custOrders.length + '</td>' +
+      '<td class="text-center">' + custOrders + '</td>' +
       '<td class="text-right">NT$' + fmtN(total) + '</td>' +
       '<td>' + esc(c.notes || '') + '</td>' +
       '<td><div class="act-group">' +
