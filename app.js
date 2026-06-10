@@ -672,6 +672,146 @@ function deleteProduct(id) {
   });
 }
 
+/* ──── Custom Dropdown Component ──── */
+var cdropInstances = {};
+function cdropInit(id, opts) {
+  // opts: { items: [{value,label,sub,icon,tag,tagCls}], placeholder, value, allowCreate, createLabel, onSelect, onChange }
+  opts = opts || {};
+  var state = { items: opts.items || [], value: opts.value || '', open: false, search: '', focusIdx: -1 };
+  cdropInstances[id] = { state: state, opts: opts };
+  var el = $(id);
+  if (!el) return;
+  cdropRender(id);
+}
+function cdropRender(id) {
+  var el = $(id); if (!el) return;
+  var inst = cdropInstances[id]; if (!inst) return;
+  var s = inst.state, o = inst.opts;
+  // Find selected item label
+  var selItem = null;
+  for (var i = 0; i < s.items.length; i++) {
+    if (String(s.items[i].value) === String(s.value)) { selItem = s.items[i]; break; }
+  }
+  var displayText = selItem ? selItem.label : '';
+  var h = '<div class="cdrop' + (s.open ? ' open' : '') + '" data-cdrop="' + id + '">' +
+    '<input class="cdrop-input" type="text" readonly value="' + esc(displayText) + '" placeholder="' + esc(o.placeholder || '選擇...') + '" data-cdrop-toggle="' + id + '">' +
+    '<span class="cdrop-arrow">▼</span>';
+  if (s.open) {
+    var filtered = s.items;
+    var q = s.search.toLowerCase();
+    if (q) {
+      filtered = s.items.filter(function(it) {
+        return (it.label + (it.sub || '')).toLowerCase().indexOf(q) >= 0;
+      });
+    }
+    h += '<div class="cdrop-panel">';
+    if (s.items.length > 5) {
+      h += '<div class="cdrop-search"><input type="text" placeholder="搜尋..." value="' + esc(s.search) + '" data-cdrop-search="' + id + '"></div>';
+    }
+    if (filtered.length === 0 && !o.allowCreate) {
+      h += '<div class="cdrop-empty">找不到符合的選項</div>';
+    } else {
+      filtered.forEach(function(it, idx) {
+        var sel = String(it.value) === String(s.value) ? ' selected' : '';
+        var foc = idx === s.focusIdx ? ' focused' : '';
+        h += '<div class="cdrop-item' + sel + foc + '" data-cdrop-pick="' + id + '" data-value="' + esc(String(it.value)) + '">';
+        if (it.icon !== undefined) {
+          h += '<div class="cdrop-icon' + (it.iconCls ? ' ' + it.iconCls : '') + '">' + esc(it.icon) + '</div>';
+        }
+        h += '<div class="cdrop-label"><div class="main">' + esc(it.label) + '</div>';
+        if (it.sub) h += '<div class="sub">' + esc(it.sub) + '</div>';
+        h += '</div>';
+        if (it.tag) h += '<span class="cdrop-tag' + (it.tagCls ? ' ' + it.tagCls : '') + '">' + esc(it.tag) + '</span>';
+        h += '</div>';
+      });
+    }
+    if (o.allowCreate && q && !filtered.some(function(it) { return it.label.toLowerCase() === q; })) {
+      h += '<div class="cdrop-create" data-cdrop-create="' + id + '" data-name="' + esc(q) + '">＋ 新增「' + esc(s.search) + '」</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
+  // Focus search input if open
+  if (s.open) {
+    var si = el.querySelector('[data-cdrop-search]');
+    if (si) setTimeout(function() { si.focus(); }, 50);
+  }
+}
+function cdropSetItems(id, items) {
+  var inst = cdropInstances[id]; if (!inst) return;
+  inst.state.items = items;
+  cdropRender(id);
+}
+function cdropGetValue(id) {
+  var inst = cdropInstances[id]; if (!inst) return '';
+  return inst.state.value;
+}
+function cdropSetValue(id, val) {
+  var inst = cdropInstances[id]; if (!inst) return;
+  inst.state.value = val;
+  cdropRender(id);
+}
+
+// Event delegation for custom dropdowns
+document.addEventListener('click', function(e) {
+  // Toggle open
+  var tog = e.target.closest('[data-cdrop-toggle]');
+  if (tog) {
+    var id = tog.getAttribute('data-cdrop-toggle');
+    var inst = cdropInstances[id]; if (!inst) return;
+    inst.state.open = !inst.state.open;
+    inst.state.search = '';
+    inst.state.focusIdx = -1;
+    cdropRender(id);
+    e.stopPropagation();
+    return;
+  }
+  // Pick item
+  var pick = e.target.closest('[data-cdrop-pick]');
+  if (pick) {
+    var id = pick.getAttribute('data-cdrop-pick');
+    var val = pick.getAttribute('data-value');
+    var inst = cdropInstances[id]; if (!inst) return;
+    inst.state.value = val;
+    inst.state.open = false;
+    inst.state.search = '';
+    cdropRender(id);
+    if (inst.opts.onSelect) inst.opts.onSelect(val);
+    if (inst.opts.onChange) inst.opts.onChange(val);
+    return;
+  }
+  // Create new
+  var cr = e.target.closest('[data-cdrop-create]');
+  if (cr) {
+    var id = cr.getAttribute('data-cdrop-create');
+    var name = cr.getAttribute('data-name');
+    var inst = cdropInstances[id]; if (!inst) return;
+    inst.state.open = false;
+    if (inst.opts.onCreate) inst.opts.onCreate(name);
+    return;
+  }
+  // Click inside panel — don't close
+  if (e.target.closest('.cdrop-panel')) return;
+  // Close all open dropdowns
+  Object.keys(cdropInstances).forEach(function(id) {
+    if (cdropInstances[id].state.open) {
+      cdropInstances[id].state.open = false;
+      cdropRender(id);
+    }
+  });
+});
+document.addEventListener('input', function(e) {
+  var si = e.target.closest('[data-cdrop-search]');
+  if (si) {
+    var id = si.getAttribute('data-cdrop-search');
+    var inst = cdropInstances[id]; if (!inst) return;
+    inst.state.search = si.value;
+    inst.state.focusIdx = -1;
+    cdropRender(id);
+  }
+});
+
 /* ──── Orders ──── */
 function renderOrders() {
   var q = ($('orderSearch').value || '').toLowerCase();
@@ -773,49 +913,60 @@ function openOrderModal(item) {
   dpInit('om_date', { value: item ? item.order_date : today() });
   $('om_channel').value = item ? (item.channel || '8591') : '8591';
 
-  var agHtml = '<option value="">（自己）</option>';
+  // Agent custom dropdown
+  var agItems = [{ value: '', label: '（自己）', icon: '👤', sub: '不指定出單人' }];
   agents.forEach(function(a) {
-    var sel = item && String(item.agent_id) === String(a.id) ? ' selected' : '';
-    agHtml += '<option value="' + a.id + '"' + sel + '>' + esc(a.name) + '</option>';
+    var agOrds = orders.filter(function(o) { return String(o.agent_id) === String(a.id) }).length;
+    agItems.push({ value: String(a.id), label: a.name, icon: a.name.charAt(0), iconCls: 'accent', sub: a.notes || '', tag: agOrds > 0 ? agOrds + '筆' : '', tagCls: 'green' });
   });
-  $('om_agent').innerHTML = agHtml;
+  cdropInit('om_agentDrop', {
+    items: agItems, placeholder: '選擇出單人', value: item ? String(item.agent_id || '') : '',
+    onSelect: function(v) { $('om_agent').value = v; calcOrderPreview(); }
+  });
+  $('om_agent').value = item ? (item.agent_id || '') : '';
 
-  // Customer datalist — sort by order count for quick selection
-  var cuSorted = customers.slice().sort(function(a, b) {
-    var aOrds = orders.filter(function(o) { return String(o.customer_id) === String(a.id) }).length;
-    var bOrds = orders.filter(function(o) { return String(o.customer_id) === String(b.id) }).length;
-    return bOrds - aOrds;
-  });
-  var cuHtml = '';
-  cuSorted.forEach(function(c) {
+  // Customer custom dropdown
+  var cuItems = [];
+  customers.slice().sort(function(a, b) {
+    var aO = orders.filter(function(o) { return String(o.customer_id) === String(a.id) }).length;
+    var bO = orders.filter(function(o) { return String(o.customer_id) === String(b.id) }).length;
+    return bO - aO;
+  }).forEach(function(c) {
     var cnt = orders.filter(function(o) { return String(o.customer_id) === String(c.id) }).length;
-    cuHtml += '<option value="' + esc(c.name) + '">' + esc(c.name) + (cnt > 0 ? ' (' + cnt + '筆)' : '') + '</option>';
+    cuItems.push({ value: String(c.id), label: c.name, icon: c.name.charAt(0), iconCls: 'accent', sub: c.contact || c.platform || '', tag: cnt > 0 ? cnt + '筆' : '' });
   });
-  $('custDatList').innerHTML = cuHtml;
-  // Set current value
-  if (item && item.customer_id) {
-    var cust = customers.filter(function(c) { return String(c.id) === String(item.customer_id) })[0];
-    $('om_customer').value = cust ? cust.name : '';
-  } else {
-    $('om_customer').value = '';
-  }
+  cdropInit('om_customerDrop', {
+    items: cuItems, placeholder: '選擇或搜尋客戶', value: item ? String(item.customer_id || '') : '',
+    allowCreate: true,
+    onCreate: function(name) {
+      // Auto-create customer inline
+      resolveCustomer(name, function(newId) {
+        if (newId) {
+          $('om_customer').value = newId;
+          // Re-init dropdown with updated customers
+          var newItems = cdropInstances['om_customerDrop'].state.items.slice();
+          newItems.unshift({ value: String(newId), label: name, icon: name.charAt(0), iconCls: 'accent', sub: '自動建立', tag: '' });
+          cdropInstances['om_customerDrop'].state.items = newItems;
+          cdropInstances['om_customerDrop'].state.value = String(newId);
+          cdropInstances['om_customerDrop'].state.open = false;
+          cdropRender('om_customerDrop');
+        }
+      });
+    },
+    onSelect: function(v) { $('om_customer').value = v; }
+  });
+  $('om_customer').value = item ? (item.customer_id || '') : '';
 
-  // Product dropdown grouped by platform
-  var prHtml = '<option value="">— 選擇商品 —</option>';
-  var grouped = {};
+  // Product custom dropdown
+  var prItems = [{ value: '', label: '— 選擇商品 —', sub: '' }];
   products.filter(function(p) { return p.status === '啟用' }).forEach(function(p) {
-    if (!grouped[p.platform]) grouped[p.platform] = [];
-    grouped[p.platform].push(p);
+    prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(p.price) });
   });
-  Object.keys(grouped).sort().forEach(function(plat) {
-    prHtml += '<optgroup label="' + esc(plat) + '">';
-    grouped[plat].forEach(function(p) {
-      var sel = item && String(item.product_id) === String(p.id) ? ' selected' : '';
-      prHtml += '<option value="' + p.id + '"' + sel + '>' + esc(p.version) + ' ' + esc(p.duration) + ' | NT$' + fmtN(p.price) + '</option>';
-    });
-    prHtml += '</optgroup>';
+  cdropInit('om_productDrop', {
+    items: prItems, placeholder: '選擇商品', value: item ? String(item.product_id || '') : '',
+    onSelect: function(v) { $('om_product').value = v; onProductSelect(); }
   });
-  $('om_product').innerHTML = prHtml;
+  $('om_product').value = item ? (item.product_id || '') : '';
 
   $('om_qty').value = item ? item.qty : 1;
   $('om_unitPrice').value = item ? item.unit_price : '';
@@ -925,13 +1076,13 @@ function saveOrder() {
   var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var ch = $('om_channel').value;
   var manualName = $('om_manualName').value.trim();
-  var custName = $('om_customer').value.trim();
+  var custId = $('om_customer').value || null;
 
   var obj = {
     order_date: dpGetVal('om_date'),
     order_no: genOrderNo(),
     agent_id: agId,
-    customer_id: null, // will be set by resolveCustomer
+    customer_id: custId,
     channel: ch,
     status: $('om_status').value,
     product_id: pid || null,
@@ -955,11 +1106,7 @@ function saveOrder() {
   var id = $('om_id').value;
   if (id) obj.order_no = orders.filter(function(o) { return String(o.id) === String(id) })[0].order_no;
 
-  // Resolve customer name → id (auto-create if new), then save order
-  resolveCustomer(custName, function(custId) {
-    obj.customer_id = custId;
-    _doSaveOrder(obj, id);
-  });
+  _doSaveOrder(obj, id);
 }
 
 function _doSaveOrder(obj, id) {

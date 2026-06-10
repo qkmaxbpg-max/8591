@@ -61,6 +61,35 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 select:hover{border-color:var(--fg3);background-color:var(--bg3)}
 select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 
+/* Custom Dropdown Component */
+.cdrop{position:relative}
+.cdrop-input{width:100%;padding:9px 32px 9px 12px;border:1px solid var(--bg4);border-radius:var(--radius-sm);background:var(--bg2);color:var(--fg0);font-size:.9rem;outline:none;transition:var(--transition);cursor:pointer}
+.cdrop-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.cdrop-input::placeholder{color:var(--fg3)}
+.cdrop-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--fg3);font-size:.7rem;transition:transform .2s}
+.cdrop.open .cdrop-arrow{transform:translateY(-50%) rotate(180deg)}
+.cdrop-panel{display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg1);border:1px solid var(--bg4);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200;max-height:240px;overflow-y:auto;overflow-x:hidden}
+.cdrop.open .cdrop-panel{display:block}
+.cdrop-search{position:sticky;top:0;padding:8px;background:var(--bg1);border-bottom:1px solid var(--bg3)}
+.cdrop-search input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--bg4);border-radius:var(--radius-sm);background:var(--bg2);color:var(--fg0);font-size:.85rem;outline:none}
+.cdrop-search input:focus{border-color:var(--accent)}
+.cdrop-search::before{content:'🔍';position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:.7rem;opacity:.5;pointer-events:none}
+.cdrop-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--bg3)}
+.cdrop-item:last-child{border-bottom:none}
+.cdrop-item:hover,.cdrop-item.focused{background:var(--bg3)}
+.cdrop-item.selected{background:var(--accent-dim)}
+.cdrop-icon{width:28px;height:28px;border-radius:6px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--fg1);flex-shrink:0}
+.cdrop-icon.accent{background:var(--accent-dim);color:var(--accent)}
+.cdrop-label{flex:1;min-width:0}
+.cdrop-label .main{font-size:.88rem;font-weight:500;color:var(--fg0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdrop-label .sub{font-size:.75rem;color:var(--fg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdrop-tag{padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;background:var(--accent-dim);color:var(--accent);white-space:nowrap}
+.cdrop-tag.green{background:var(--green-dim);color:var(--green)}
+.cdrop-tag.yellow{background:var(--yellow-dim);color:var(--yellow)}
+.cdrop-empty{padding:16px;text-align:center;color:var(--fg3);font-size:.85rem}
+.cdrop-create{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;transition:background .15s;border-top:1px solid var(--bg3);color:var(--accent);font-size:.85rem}
+.cdrop-create:hover{background:var(--accent-dim)}
+
 /* Top Bar */
 #topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg1);border-bottom:1px solid var(--bg3);position:sticky;top:0;z-index:100}
 .top-left{display:flex;align-items:center;gap:8px}

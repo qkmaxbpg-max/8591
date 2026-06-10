@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 
@@ -225,12 +225,12 @@
       <div class="form-group"><label>銷售管道</label><select id="om_channel" onchange="onChannelChange()"><option value="8591">8591</option><option value="個人">個人</option></select></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>出單人</label><select id="om_agent" onchange="calcOrderPreview()"></select></div>
-      <div class="form-group"><label>客戶</label><input id="om_customer" list="custDatList" placeholder="選擇或輸入新客戶名稱" autocomplete="off"><datalist id="custDatList"></datalist></div>
+      <div class="form-group"><label>出單人</label><div id="om_agentDrop"></div><input id="om_agent" type="hidden"></div>
+      <div class="form-group"><label>客戶</label><div id="om_customerDrop"></div><input id="om_customer" type="hidden"></div>
     </div>
     <div class="form-group" id="om_productGroup">
       <label>選擇商品</label>
-      <select id="om_product" onchange="onProductSelect()"><option value="">— 選擇商品 —</option></select>
+      <div id="om_productDrop"></div><input id="om_product" type="hidden">
     </div>
     <div id="om_manualGroup" style="display:none">
       <div class="form-row">
@@ -415,6 +415,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>
