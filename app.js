@@ -673,103 +673,104 @@ function deleteProduct(id) {
 }
 
 /* ──── Custom Dropdown Component ──── */
-// Inline search: type freely in input, suggestions appear below.
-// opts: { items, placeholder, value, allowCreate, onSelect, onCreate, freeText }
 var cdropInstances = {};
 function cdropInit(id, opts) {
   opts = opts || {};
   var state = { items: opts.items || [], value: opts.value || '', text: '', open: false };
-  cdropInstances[id] = { state: state, opts: opts };
-  // Set initial text from value
   var sel = state.items.filter(function(it) { return String(it.value) === String(state.value) })[0];
   state.text = sel ? sel.label : '';
-  cdropRender(id);
-}
-function cdropRender(id) {
+  cdropInstances[id] = { state: state, opts: opts };
+  // Build initial DOM: input is static, panel is separate
   var el = $(id); if (!el) return;
+  el.innerHTML = '<div class="cdrop">' +
+    '<input class="cdrop-input" type="text" placeholder="' + esc(opts.placeholder || '選擇...') + '" data-cdrop-input="' + id + '" autocomplete="off" value="' + esc(state.text) + '">' +
+    '<span class="cdrop-arrow" data-cdrop-toggle="' + id + '">▼</span>' +
+    '<div class="cdrop-panel" style="display:none" data-cdrop-panel="' + id + '"></div></div>';
+}
+function cdropRenderPanel(id) {
   var inst = cdropInstances[id]; if (!inst) return;
   var s = inst.state, o = inst.opts;
-  var h = '<div class="cdrop' + (s.open ? ' open' : '') + '">' +
-    '<input class="cdrop-input" type="text" value="' + esc(s.text) + '" placeholder="' + esc(o.placeholder || '選擇...') + '" data-cdrop-input="' + id + '" autocomplete="off">' +
-    '<span class="cdrop-arrow" data-cdrop-toggle="' + id + '">▼</span>';
-  if (s.open) {
-    var q = s.text.toLowerCase();
-    var filtered = q ? s.items.filter(function(it) {
-      return (it.label + (it.sub || '')).toLowerCase().indexOf(q) >= 0;
-    }) : s.items;
-    h += '<div class="cdrop-panel">';
-    if (filtered.length === 0 && !o.allowCreate) {
-      h += '<div class="cdrop-empty">找不到符合的選項</div>';
-    }
-    filtered.forEach(function(it) {
-      var sel = String(it.value) === String(s.value) ? ' selected' : '';
-      h += '<div class="cdrop-item' + sel + '" data-cdrop-pick="' + id + '" data-value="' + esc(String(it.value)) + '">';
-      if (it.icon !== undefined) h += '<div class="cdrop-icon' + (it.iconCls ? ' ' + it.iconCls : '') + '">' + esc(it.icon) + '</div>';
-      h += '<div class="cdrop-label"><div class="main">' + esc(it.label) + '</div>';
-      if (it.sub) h += '<div class="sub">' + esc(it.sub) + '</div>';
-      h += '</div>';
-      if (it.tag) h += '<span class="cdrop-tag' + (it.tagCls ? ' ' + it.tagCls : '') + '">' + esc(it.tag) + '</span>';
-      h += '</div>';
-    });
-    if (o.allowCreate && q && !s.items.some(function(it) { return it.label.toLowerCase() === q; })) {
-      h += '<div class="cdrop-create" data-cdrop-create="' + id + '" data-name="' + esc(s.text) + '">＋ 新增「' + esc(s.text) + '」</div>';
-    }
-    h += '</div>';
+  var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
+  if (!panel) return;
+  var q = s.text.toLowerCase();
+  var filtered = q ? s.items.filter(function(it) {
+    return (it.label + (it.sub || '')).toLowerCase().indexOf(q) >= 0;
+  }) : s.items;
+  var h = '';
+  if (filtered.length === 0 && !o.allowCreate) {
+    h = '<div class="cdrop-empty">找不到符合的選項</div>';
   }
-  h += '</div>';
-  el.innerHTML = h;
+  filtered.forEach(function(it) {
+    var sel = String(it.value) === String(s.value) ? ' selected' : '';
+    h += '<div class="cdrop-item' + sel + '" data-cdrop-pick="' + id + '" data-value="' + esc(String(it.value)) + '">';
+    if (it.icon !== undefined) h += '<div class="cdrop-icon' + (it.iconCls ? ' ' + it.iconCls : '') + '">' + esc(it.icon) + '</div>';
+    h += '<div class="cdrop-label"><div class="main">' + esc(it.label) + '</div>';
+    if (it.sub) h += '<div class="sub">' + esc(it.sub) + '</div>';
+    h += '</div>';
+    if (it.tag) h += '<span class="cdrop-tag' + (it.tagCls ? ' ' + it.tagCls : '') + '">' + esc(it.tag) + '</span>';
+    h += '</div>';
+  });
+  if (o.allowCreate && q && !s.items.some(function(it) { return it.label.toLowerCase() === q; })) {
+    h += '<div class="cdrop-create" data-cdrop-create="' + id + '" data-name="' + esc(s.text) + '">＋ 新增「' + esc(s.text) + '」</div>';
+  }
+  panel.innerHTML = h;
+}
+function cdropOpen(id) {
+  var inst = cdropInstances[id]; if (!inst) return;
+  inst.state.open = true;
+  var wrap = document.querySelector('[data-cdrop-input="' + id + '"]');
+  if (wrap) wrap.closest('.cdrop').classList.add('open');
+  var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
+  if (panel) panel.style.display = 'block';
+  cdropRenderPanel(id);
+}
+function cdropClose(id) {
+  var inst = cdropInstances[id]; if (!inst) return;
+  inst.state.open = false;
+  var wrap = document.querySelector('[data-cdrop-input="' + id + '"]');
+  if (wrap) wrap.closest('.cdrop').classList.remove('open');
+  var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
+  if (panel) panel.style.display = 'none';
 }
 function cdropSetValue(id, val) {
   var inst = cdropInstances[id]; if (!inst) return;
   inst.state.value = val;
   var sel = inst.state.items.filter(function(it) { return String(it.value) === String(val) })[0];
   inst.state.text = sel ? sel.label : '';
-  cdropRender(id);
+  var inp = document.querySelector('[data-cdrop-input="' + id + '"]');
+  if (inp) inp.value = inst.state.text;
 }
 
-// Event: typing in cdrop input
+// Typing — only update panel, never touch input
 document.addEventListener('input', function(e) {
   var inp = e.target.closest('[data-cdrop-input]');
   if (!inp) return;
   var id = inp.getAttribute('data-cdrop-input');
   var inst = cdropInstances[id]; if (!inst) return;
   inst.state.text = inp.value;
-  inst.state.open = true;
-  inst.state.value = ''; // clear selection when typing freely
-  // Re-render but keep cursor position
-  var pos = inp.selectionStart;
-  cdropRender(id);
-  var newInp = $(id).querySelector('[data-cdrop-input]');
-  if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
+  inst.state.value = '';
+  if (!inst.state.open) cdropOpen(id);
+  else cdropRenderPanel(id);
 });
-// Event: focus on cdrop input — open panel
+// Focus — open panel without rebuilding input
 document.addEventListener('focusin', function(e) {
   var inp = e.target.closest('[data-cdrop-input]');
   if (!inp) return;
   var id = inp.getAttribute('data-cdrop-input');
-  var inst = cdropInstances[id]; if (!inst) return;
-  inst.state.open = true;
-  cdropRender(id);
-  var newInp = $(id).querySelector('[data-cdrop-input]');
-  if (newInp) newInp.focus();
+  var inst = cdropInstances[id]; if (!inst || inst.state.open) return;
+  cdropOpen(id);
 });
-// Event: click
+// Click delegation
 document.addEventListener('click', function(e) {
-  // Arrow toggle
   var tog = e.target.closest('[data-cdrop-toggle]');
   if (tog) {
     var id = tog.getAttribute('data-cdrop-toggle');
     var inst = cdropInstances[id]; if (!inst) return;
-    inst.state.open = !inst.state.open;
-    cdropRender(id);
-    if (inst.state.open) {
-      var newInp = $(id).querySelector('[data-cdrop-input]');
-      if (newInp) newInp.focus();
-    }
+    if (inst.state.open) cdropClose(id);
+    else { cdropOpen(id); var inp = document.querySelector('[data-cdrop-input="' + id + '"]'); if (inp) inp.focus(); }
     e.stopPropagation();
     return;
   }
-  // Pick item
   var pick = e.target.closest('[data-cdrop-pick]');
   if (pick) {
     var id = pick.getAttribute('data-cdrop-pick');
@@ -778,30 +779,24 @@ document.addEventListener('click', function(e) {
     var selItem = inst.state.items.filter(function(it) { return String(it.value) === val })[0];
     inst.state.value = val;
     inst.state.text = selItem ? selItem.label : '';
-    inst.state.open = false;
-    cdropRender(id);
+    var inp = document.querySelector('[data-cdrop-input="' + id + '"]');
+    if (inp) inp.value = inst.state.text;
+    cdropClose(id);
     if (inst.opts.onSelect) inst.opts.onSelect(val);
     return;
   }
-  // Create new
   var cr = e.target.closest('[data-cdrop-create]');
   if (cr) {
     var id = cr.getAttribute('data-cdrop-create');
     var name = cr.getAttribute('data-name');
     var inst = cdropInstances[id]; if (!inst) return;
-    inst.state.open = false;
-    cdropRender(id);
+    cdropClose(id);
     if (inst.opts.onCreate) inst.opts.onCreate(name);
     return;
   }
-  // Click inside panel or input — don't close
   if (e.target.closest('.cdrop-panel') || e.target.closest('[data-cdrop-input]')) return;
-  // Close all
   Object.keys(cdropInstances).forEach(function(cid) {
-    if (cdropInstances[cid].state.open) {
-      cdropInstances[cid].state.open = false;
-      cdropRender(cid);
-    }
+    if (cdropInstances[cid].state.open) cdropClose(cid);
   });
 });
 
