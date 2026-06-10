@@ -45,6 +45,8 @@ input,select,textarea{font-family:inherit;font-size:inherit}
 .btn.full{width:100%}
 .icon-btn{background:none;border:none;color:var(--fg2);font-size:1.3rem;cursor:pointer;padding:8px;border-radius:var(--radius-sm);transition:var(--transition);min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
 .icon-btn:hover{color:var(--fg0);background:var(--bg3)}
+.icon-btn.spin{animation:spin 0.8s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover}
 
 /* Forms */

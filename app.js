@@ -1273,9 +1273,28 @@ function deleteExp(id) {
 
 /* ──── Refresh ──── */
 function doRefresh() {
-  if (isDemo) { loadAll(); toast('已重新整理', 'ok'); return }
-  loadAll();
-  toast('已重新整理', 'ok');
+  var btn = document.querySelector('[onclick="doRefresh()"]');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.classList.add('spin'); }
+  if (isDemo) { loadAll(); toast('已重新整理', 'ok'); if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.classList.remove('spin'); } return }
+  Promise.all([
+    sb.from('products').select('*').eq('user_id', userId).order('sort_order'),
+    sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
+    sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
+    sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
+  ]).then(function(res) {
+    products = res[0].data || [];
+    agents = res[1].data || [];
+    customers = res[2].data || [];
+    orders = res[3].data || [];
+    ads = res[4].data || [];
+    renderAll();
+    toast('已重新整理 ✓', 'ok');
+  }).catch(function(err) {
+    toast('重新整理失敗：' + err.message, 'err');
+  }).then(function() {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.classList.remove('spin'); }
+  });
 }
 
 /* ──── Global Event Delegation ──── */
