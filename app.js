@@ -959,16 +959,19 @@ function openOrderModal(item) {
   $('om_channel').value = item ? (item.channel || '8591') : '8591';
 
   // Agent custom dropdown
-  var agItems = [{ value: '', label: '（自己）', icon: '👤', sub: '不指定出單人' }];
+  var selfAgent = agents.filter(function(a) { return a.name === '自己' })[0];
+  var defaultAgentId = selfAgent ? String(selfAgent.id) : '';
+  var agItems = [];
   agents.forEach(function(a) {
     var agOrds = orders.filter(function(o) { return String(o.agent_id) === String(a.id) }).length;
     agItems.push({ value: String(a.id), label: a.name, icon: a.name.charAt(0), iconCls: 'accent', sub: a.notes || '', tag: agOrds > 0 ? agOrds + '筆' : '', tagCls: 'green' });
   });
+  var editAgentVal = item ? String(item.agent_id || '') : defaultAgentId;
   cdropInit('om_agentDrop', {
-    items: agItems, placeholder: '選擇出單人', value: item ? String(item.agent_id || '') : '',
+    items: agItems, placeholder: '選擇出單人', value: editAgentVal,
     onSelect: function(v) { $('om_agent').value = v; calcOrderPreview(); }
   });
-  $('om_agent').value = item ? (item.agent_id || '') : '';
+  $('om_agent').value = editAgentVal;
 
   // Customer custom dropdown
   var cuItems = [];
@@ -1255,15 +1258,14 @@ function renderAgents() {
     if (agOrders.length === 0) {
       h += '<div class="text-sm" style="color:var(--fg3);padding:8px 0">尚無已完成訂單</div>';
     } else {
-      h += '<table><tr><th>日期</th><th>商品</th><th class="text-right">利潤</th><th class="text-right">抽成金額</th></tr>';
+      h += '<table><tr><th>日期</th><th class="text-right">利潤</th><th class="text-right">抽成金額</th></tr>';
       agOrders.forEach(function(o) {
         var p = orderProfit(o);
         h += '<tr><td>' + (o.order_date || '') + '</td>' +
-          '<td>' + esc(o.platform || '') + ' ' + esc(o.version || '') + '</td>' +
           '<td class="text-right ' + (p.profit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(p.profit) + '</td>' +
           '<td class="text-right text-red">NT$' + fmtN(p.comm) + '</td></tr>';
       });
-      h += '<tr style="border-top:2px solid var(--bg4);font-weight:700"><td colspan="2">合計</td>' +
+      h += '<tr style="border-top:2px solid var(--bg4);font-weight:700"><td>合計</td>' +
         '<td class="text-right ' + (totalProfit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(totalProfit) + '</td>' +
         '<td class="text-right text-red">NT$' + fmtN(totalComm) + '</td></tr>';
       h += '</table>';
