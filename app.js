@@ -946,12 +946,12 @@ function openOrderModal(item) {
   $('om_customer').value = item ? (item.customer_id || '') : '';
 
   // Product custom dropdown
-  var prItems = [{ value: '', label: '— 選擇商品 —', sub: '' }];
+  var prItems = [];
   products.filter(function(p) { return p.status === '啟用' }).forEach(function(p) {
     prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(p.price) });
   });
   cdropInit('om_productDrop', {
-    items: prItems, placeholder: '選擇商品', value: item ? String(item.product_id || '') : '',
+    items: prItems, placeholder: '搜尋或選擇商品...', value: item ? String(item.product_id || '') : '',
     onSelect: function(v) { $('om_product').value = v; onProductSelect(); }
   });
   $('om_product').value = item ? (item.product_id || '') : '';

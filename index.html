@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=31">
+<link rel="stylesheet" href="style.css?v=34">
 </head>
 <body>
 
@@ -97,8 +97,7 @@
   <section id="tab-orders" class="tab-content">
     <div class="toolbar">
       <div class="toolbar-top">
-        <button class="btn primary" onclick="openOrderModal()">＋ 新增訂單</button>
-        <button class="btn accent" onclick="openImportModal()">⚡ 快速匯入</button>
+        <div class="order-actions"><button class="btn primary btn-lg" onclick="openOrderModal()">＋ 新增訂單</button><button class="btn ghost btn-sm-alt" onclick="openImportModal()">⚡ 快速匯入</button></div>
         <div class="search-box"><input id="orderSearch" type="text" placeholder="搜尋訂單..." oninput="renderOrders()"></div>
       </div>
       <div class="filter-tags" id="orderFilters">
@@ -415,6 +414,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
