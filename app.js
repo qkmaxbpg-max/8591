@@ -96,7 +96,6 @@ function enterDemo() {
 function enterApp(label) {
   $('loginPage').style.display = 'none';
   $('app').style.display = '';
-  $('userLabel').textContent = label;
   mpInit('mpDash', renderDashboard);
   mpInit('mpOrders', renderOrders);
   mpInit('mpExp', renderAds);
