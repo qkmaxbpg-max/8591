@@ -154,16 +154,11 @@ function loadAll() {
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
-    // ad_configs loaded separately to avoid breaking main data
-    try {
-      sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
-        adConfigs = (r2 && r2.data) ? r2.data : [];
-        renderAll();
-      });
-    } catch(e) {
-      adConfigs = [];
-      renderAll();
-    }
+    renderAll();
+    // ad_configs loaded separately — re-render ads tab when ready
+    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
+      if (r2 && r2.data) { adConfigs = r2.data; renderAds(); }
+    }).catch(function() { adConfigs = []; });
   }).catch(function(err) {
     console.error('loadAll failed:', err);
     toast('載入失敗，請重新整理', 'err');
