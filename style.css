@@ -72,8 +72,8 @@ select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .cdrop-input::placeholder{color:var(--fg3)}
 .cdrop-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--fg3);font-size:.7rem;transition:transform .2s}
 .cdrop.open .cdrop-arrow{transform:translateY(-50%) rotate(180deg)}
-.cdrop-panel{display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg1);border:1px solid var(--bg4);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200;max-height:240px;overflow-y:auto;overflow-x:hidden}
-.cdrop.open .cdrop-panel{display:block}
+.cdrop-panel{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg1);border:1px solid var(--bg4);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200;max-height:240px;overflow-y:auto;overflow-x:hidden;opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .15s ease,transform .15s ease}
+.cdrop.open .cdrop-panel{opacity:1;transform:translateY(0);pointer-events:auto}
 .cdrop-search{position:sticky;top:0;padding:8px;background:var(--bg1);border-bottom:1px solid var(--bg3)}
 .cdrop-search input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--bg4);border-radius:var(--radius-sm);background:var(--bg2);color:var(--fg0);font-size:.85rem;outline:none}
 .cdrop-search input:focus{border-color:var(--accent)}

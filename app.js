@@ -685,7 +685,7 @@ function cdropInit(id, opts) {
   el.innerHTML = '<div class="cdrop">' +
     '<input class="cdrop-input" type="text" placeholder="' + esc(opts.placeholder || '選擇...') + '" data-cdrop-input="' + id + '" autocomplete="off" value="' + esc(state.text) + '">' +
     '<span class="cdrop-arrow" data-cdrop-toggle="' + id + '">▼</span>' +
-    '<div class="cdrop-panel" style="display:none" data-cdrop-panel="' + id + '"></div></div>';
+    '<div class="cdrop-panel" data-cdrop-panel="' + id + '"></div></div>';
 }
 function cdropRenderPanel(id) {
   var inst = cdropInstances[id]; if (!inst) return;
@@ -720,8 +720,6 @@ function cdropOpen(id) {
   inst.state.open = true;
   var wrap = document.querySelector('[data-cdrop-input="' + id + '"]');
   if (wrap) wrap.closest('.cdrop').classList.add('open');
-  var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
-  if (panel) panel.style.display = 'block';
   cdropRenderPanel(id);
 }
 function cdropClose(id) {
@@ -729,8 +727,6 @@ function cdropClose(id) {
   inst.state.open = false;
   var wrap = document.querySelector('[data-cdrop-input="' + id + '"]');
   if (wrap) wrap.closest('.cdrop').classList.remove('open');
-  var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
-  if (panel) panel.style.display = 'none';
 }
 function cdropSetValue(id, val) {
   var inst = cdropInstances[id]; if (!inst) return;
@@ -771,7 +767,7 @@ document.addEventListener('focusout', function(e) {
     var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
     if (active && (active === inp || (panel && panel.contains(active)))) return;
     cdropClose(id);
-  }, 150);
+  }, 80);
 });
 // Click delegation
 document.addEventListener('click', function(e) {
