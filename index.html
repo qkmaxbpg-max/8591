@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 
@@ -169,11 +169,11 @@
   <!-- Ads -->
   <section id="tab-ads" class="tab-content">
     <div class="toolbar">
-      <button class="btn primary" onclick="openExpModal()">＋ 新增廣告支出</button>
+      <button class="btn primary" onclick="openAdConfigModal()">＋ 新增廣告設定</button>
     </div>
     <div id="mpExp" class="month-picker-bar" data-target="ads"></div>
     <div class="stat-cards" id="expStatCards"></div>
-    <div id="expList" class="table-wrap"></div>
+    <div id="adConfigList"></div>
   </section>
 
 </div>
@@ -304,24 +304,25 @@
   </div>
 </div>
 
-<!-- Expense Modal -->
-<div id="expModal" class="modal modal-sm">
+<!-- Ad Config Modal -->
+<div id="adConfigModal" class="modal modal-sm">
   <div class="modal-head">
-    <h3 id="expModalTitle">新增廣告支出</h3>
+    <h3 id="adConfigModalTitle">新增廣告設定</h3>
     <button class="close-btn" onclick="closeModal()">&times;</button>
   </div>
   <div class="modal-body">
-    <input id="exp_id" type="hidden">
+    <input id="adc_id" type="hidden">
+    <div class="form-group"><label>廣告平台</label><input id="adc_platform" list="adcPlatformList" placeholder="8591 / Dcard / FB"><datalist id="adcPlatformList"><option value="8591"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google"></datalist></div>
+    <div class="form-group"><label>每日金額 (NT$)</label><input id="adc_daily" type="number" min="0" placeholder="0"></div>
     <div class="form-row">
-      <div class="form-group"><label>日期</label><div id="exp_date" class="dp-wrap"></div></div>
-      <div class="form-group"><label>金額 (NT$)</label><input id="exp_amount" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><label>開始日期</label><div id="adc_start" class="dp-wrap"></div></div>
+      <div class="form-group"><label>結束日期</label><div id="adc_end" class="dp-wrap"></div><label class="hint"><input id="adc_noend" type="checkbox" onchange="toggleAdcEnd()"> 持續投放（不設結束日）</label></div>
     </div>
-    <div class="form-group"><label>廣告平台</label><input id="exp_platform" list="expPlatformList" placeholder="8591 / Dcard / FB"><datalist id="expPlatformList"><option value="8591"><option value="Dcard"><option value="Facebook"><option value="Instagram"><option value="蝦皮"><option value="Google"></datalist></div>
-    <div class="form-group"><label>備註</label><input id="exp_notes" placeholder=""></div>
+    <div class="form-group"><label>備註</label><input id="adc_notes" placeholder=""></div>
   </div>
   <div class="modal-foot">
     <button class="btn ghost" onclick="closeModal()">取消</button>
-    <button class="btn primary" onclick="saveExp()">儲存</button>
+    <button class="btn primary" onclick="saveAdConfig()">儲存</button>
   </div>
 </div>
 
@@ -414,6 +415,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>

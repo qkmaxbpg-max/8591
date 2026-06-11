@@ -3,7 +3,7 @@ var SUPABASE_URL='https://hpajiexvcmkidbgreaqy.supabase.co';
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwYWppZXh2Y21raWRiZ3JlYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTY2NTQsImV4cCI6MjA5NDU5MjY1NH0.ZIxx-cJRHxLAv-TlPpjvFGBndzs-GE9ptZENh81AQQQ';
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var sb = null, userId = null, isDemo = false;
-var products = [], agents = [], customers = [], orders = [], ads = [];
+var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [];
 
 /* 個人管道預設商品 */
 var PERSONAL_PRESETS_DEFAULT = ['原神','崩鐵','鳴潮','絕區零','傳說','抖音','代付'];
@@ -90,6 +90,7 @@ function enterDemo() {
   customers = JSON.parse(localStorage.getItem('proxy-demo-customers') || '[]');
   orders = JSON.parse(localStorage.getItem('proxy-demo-orders') || '[]');
   ads = JSON.parse(localStorage.getItem('proxy-demo-ads') || '[]');
+  adConfigs = JSON.parse(localStorage.getItem('proxy-demo-adconfigs') || '[]');
   enterApp('本機模式');
 }
 function enterApp(label) {
@@ -134,6 +135,7 @@ function demoSave() {
   localStorage.setItem('proxy-demo-customers', JSON.stringify(customers));
   localStorage.setItem('proxy-demo-orders', JSON.stringify(orders));
   localStorage.setItem('proxy-demo-ads', JSON.stringify(ads));
+  localStorage.setItem('proxy-demo-adconfigs', JSON.stringify(adConfigs));
 }
 
 function loadAll() {
@@ -143,9 +145,9 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false }),
+    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false })
   ]).then(function(res) {
-    // Log any table errors
     res.forEach(function(r, i) {
       if (r.error) console.warn('Table load error [' + i + ']:', r.error.message);
     });
@@ -154,7 +156,7 @@ function loadAll() {
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
-    if (res[4].error) toast('廣告資料載入失敗：請確認已執行 ALTER TABLE ads RENAME TO ad_spends', 'err');
+    adConfigs = res[5] && res[5].data ? res[5].data : [];
     renderAll();
   });
 }
@@ -218,8 +220,43 @@ function genOrderNo() {
   return d + '-' + (seq < 10 ? '0' + seq : seq);
 }
 function monthAds(ym) {
-  return ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym })
+  var oldTotal = ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym })
     .reduce(function(s, a) { return s + (a.amount || 0) }, 0);
+  return oldTotal + calcAdConfigCost(ym);
+}
+function calcAdConfigCost(ym) {
+  var mStart = ym + '-01';
+  var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
+  var mEndDate = new Date(y, m, 0);
+  var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
+  var total = 0;
+  adConfigs.forEach(function(c) {
+    if (!c.active) return;
+    var s = c.start_date || '';
+    var e = c.end_date || '9999-12-31';
+    if (e < mStart || s > mEnd) return;
+    var effStart = s > mStart ? s : mStart;
+    var effEnd = e < mEnd ? e : mEnd;
+    var d1 = new Date(effStart); var d2 = new Date(effEnd);
+    var days = Math.round((d2 - d1) / 86400000) + 1;
+    if (days > 0) total += days * (c.daily_cost || 0);
+  });
+  return total;
+}
+function calcAdConfigCostRange(startDate, endDate) {
+  var total = 0;
+  adConfigs.forEach(function(c) {
+    if (!c.active) return;
+    var s = c.start_date || '';
+    var e = c.end_date || '9999-12-31';
+    if (e < startDate || s > endDate) return;
+    var effStart = s > startDate ? s : startDate;
+    var effEnd = e < endDate ? e : endDate;
+    var d1 = new Date(effStart); var d2 = new Date(effEnd);
+    var days = Math.round((d2 - d1) / 86400000) + 1;
+    if (days > 0) total += days * (c.daily_cost || 0);
+  });
+  return total;
 }
 
 /* ──── Month Picker Component ──── */
@@ -442,9 +479,9 @@ function renderDashboard() {
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
   var adTotal = isAll
-    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0)
+    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.filter(function(c){return c.active}).reduce(function(s,c){ var sd=c.start_date||today(),ed=c.end_date||today(); return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
     : isYear
-      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy }).reduce(function(s, a) { return s + (a.amount || 0) }, 0)
+      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
       : monthAds(ym);
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
@@ -1342,102 +1379,193 @@ function deleteCustomer(id) {
   });
 }
 
-/* ──── Ads ──── */
+/* ──── Ads (Config-based) ──── */
+function adConfigStatus(c) {
+  if (!c.active) return { label: '已暫停', cls: 'badge grey' };
+  var t = today();
+  if (c.start_date > t) return { label: '未開始', cls: 'badge blue' };
+  if (c.end_date && c.end_date < t) return { label: '已結束', cls: 'badge grey' };
+  return { label: '投放中', cls: 'badge green' };
+}
+function adConfigDaysInMonth(c, ym) {
+  var mStart = ym + '-01';
+  var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
+  var mEndDate = new Date(y, m, 0);
+  var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
+  var s = c.start_date || '';
+  var e = c.end_date || '9999-12-31';
+  if (e < mStart || s > mEnd) return 0;
+  var effStart = s > mStart ? s : mStart;
+  var effEnd = e < mEnd ? e : mEnd;
+  var d1 = new Date(effStart); var d2 = new Date(effEnd);
+  return Math.max(0, Math.round((d2 - d1) / 86400000) + 1);
+}
 function renderAds() {
   var ym = mpGetYM('mpExp');
   var isAll = mpIsAll('mpExp');
   var isYear = mpIsYear('mpExp');
   var yy = mpGetYear('mpExp');
-  var list = ads.filter(function(a) {
-    if (isAll) return true;
-    var d = a.ad_date || '';
-    if (isYear) return d.slice(0, 4) === yy;
-    return d.slice(0, 7) === ym;
-  });
 
-  // Stats by platform
+  // Calculate costs from configs
   var platMap = {};
   var total = 0;
-  list.forEach(function(a) {
-    var p = a.ad_platform || '其他';
-    if (!platMap[p]) platMap[p] = 0;
-    platMap[p] += a.amount || 0;
-    total += a.amount || 0;
+  adConfigs.forEach(function(c) {
+    if (!c.active) return;
+    var cost = 0;
+    if (isAll) {
+      var s = c.start_date || today();
+      var e = c.end_date || today();
+      var d1 = new Date(s); var d2 = new Date(e);
+      cost = (Math.round((d2 - d1) / 86400000) + 1) * (c.daily_cost || 0);
+    } else if (isYear) {
+      for (var mi = 1; mi <= 12; mi++) {
+        var mm = mi < 10 ? '0' + mi : '' + mi;
+        cost += adConfigDaysInMonth(c, yy + '-' + mm) * (c.daily_cost || 0);
+      }
+    } else {
+      cost = adConfigDaysInMonth(c, ym) * (c.daily_cost || 0);
+    }
+    if (cost > 0) {
+      var p = c.platform || '其他';
+      if (!platMap[p]) platMap[p] = 0;
+      platMap[p] += cost;
+      total += cost;
+    }
   });
-  var statHtml = statCard('總廣告費', 'NT$' + fmtN(total), list.length + ' 筆', 'red');
+  // Add old ad_spends records
+  ads.forEach(function(a) {
+    var d = a.ad_date || '';
+    var match = isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
+    if (match) {
+      var p = a.ad_platform || '其他';
+      if (!platMap[p]) platMap[p] = 0;
+      platMap[p] += a.amount || 0;
+      total += a.amount || 0;
+    }
+  });
+
+  var statHtml = statCard('總廣告費', 'NT$' + fmtN(total), '', 'red');
   Object.keys(platMap).sort(function(a, b) { return platMap[b] - platMap[a] }).forEach(function(p) {
     statHtml += statCard(p, 'NT$' + fmtN(platMap[p]), fmtP(total > 0 ? platMap[p] / total : 0));
   });
   $('expStatCards').innerHTML = statHtml;
 
-  if (list.length === 0) {
-    $('expList').innerHTML = '<div class="empty"><div class="icon">📢</div><p>尚無廣告記錄</p></div>';
+  // Render config cards
+  if (adConfigs.length === 0) {
+    $('adConfigList').innerHTML = '<div class="empty"><div class="icon">📢</div><p>尚無廣告設定</p><p class="text-sm">新增設定後，系統會自動計算每月廣告費</p></div>';
     return;
   }
-  var h = '<table><tr><th>日期</th><th>廣告平台</th><th class="text-right">金額</th><th>備註</th><th>操作</th></tr>';
-  list.forEach(function(a) {
-    h += '<tr><td>' + (a.ad_date || '') + '</td><td>' + esc(a.ad_platform || '') + '</td>' +
-      '<td class="text-right text-red">NT$' + fmtN(a.amount) + '</td>' +
-      '<td>' + esc(a.notes || '') + '</td>' +
-      '<td><div class="act-group">' +
-        '<button class="act-btn edit" data-action="editExp" data-id="' + a.id + '">編輯</button>' +
-        '<button class="act-btn del" data-action="deleteExp" data-id="' + a.id + '">刪除</button>' +
-      '</div></td></tr>';
+  var h = '';
+  adConfigs.forEach(function(c) {
+    var st = adConfigStatus(c);
+    var endTxt = c.end_date || '持續投放';
+    var days = isAll ? '' : (isYear ? '' : adConfigDaysInMonth(c, ym) + ' 天');
+    var mCost = isAll ? '' : (isYear ? '' : 'NT$' + fmtN(adConfigDaysInMonth(c, ym) * (c.daily_cost || 0)));
+    h += '<div class="card" style="margin-bottom:8px;padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px"><strong>' + esc(c.platform || '') + '</strong><span class="' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="act-group">' +
+          (c.active
+            ? '<button class="act-btn" data-action="toggleAdConfig" data-id="' + c.id + '">暫停</button>'
+            : '<button class="act-btn edit" data-action="toggleAdConfig" data-id="' + c.id + '">恢復</button>') +
+          '<button class="act-btn edit" data-action="editAdConfig" data-id="' + c.id + '">編輯</button>' +
+          '<button class="act-btn del" data-action="deleteAdConfig" data-id="' + c.id + '">刪除</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--fg2)">' +
+        '<span>每日 <b class="text-red">NT$' + fmtN(c.daily_cost || 0) + '</b></span>' +
+        '<span>' + (c.start_date || '') + ' → ' + endTxt + '</span>' +
+        (days ? '<span>本月 ' + days + ' / ' + mCost + '</span>' : '') +
+        (c.notes ? '<span>📝 ' + esc(c.notes) + '</span>' : '') +
+      '</div>' +
+    '</div>';
   });
-  $('expList').innerHTML = h + '</table>';
+  $('adConfigList').innerHTML = h;
 }
-function openExpModal(item) {
-  $('expModalTitle').textContent = item ? '編輯廣告支出' : '新增廣告支出';
-  $('exp_id').value = item ? item.id : '';
-  dpInit('exp_date', { value: item ? item.ad_date : today() });
-  $('exp_amount').value = item ? item.amount : '';
-  $('exp_platform').value = item ? (item.ad_platform || '') : '8591';
-  $('exp_notes').value = item ? (item.notes || '') : '';
-  openModal('expModal');
+function toggleAdcEnd() {
+  var chk = $('adc_noend');
+  var wrap = $('adc_end');
+  if (chk.checked) {
+    wrap.style.opacity = '0.4';
+    wrap.style.pointerEvents = 'none';
+  } else {
+    wrap.style.opacity = '1';
+    wrap.style.pointerEvents = '';
+  }
 }
-function editExp(id) {
-  var item = ads.filter(function(a) { return String(a.id) === String(id) })[0];
-  if (item) openExpModal(item);
-  else toast('找不到此記錄', 'err');
+function openAdConfigModal(item) {
+  $('adConfigModalTitle').textContent = item ? '編輯廣告設定' : '新增廣告設定';
+  $('adc_id').value = item ? item.id : '';
+  $('adc_platform').value = item ? (item.platform || '') : '';
+  $('adc_daily').value = item ? item.daily_cost : '';
+  dpInit('adc_start', { value: item ? item.start_date : today() });
+  var noEnd = item ? !item.end_date : false;
+  $('adc_noend').checked = noEnd;
+  dpInit('adc_end', { value: item && item.end_date ? item.end_date : '' });
+  toggleAdcEnd();
+  $('adc_notes').value = item ? (item.notes || '') : '';
+  openModal('adConfigModal');
 }
-function saveExp() {
+function editAdConfig(id) {
+  var item = adConfigs.filter(function(c) { return String(c.id) === String(id) })[0];
+  if (item) openAdConfigModal(item);
+  else toast('找不到此設定', 'err');
+}
+function saveAdConfig() {
+  var noEnd = $('adc_noend').checked;
   var obj = {
-    ad_date: dpGetVal('exp_date'),
-    amount: Number($('exp_amount').value) || 0,
-    ad_platform: $('exp_platform').value.trim(),
-    notes: $('exp_notes').value.trim()
+    platform: $('adc_platform').value.trim(),
+    daily_cost: Number($('adc_daily').value) || 0,
+    start_date: dpGetVal('adc_start'),
+    end_date: noEnd ? null : (dpGetVal('adc_end') || null),
+    notes: $('adc_notes').value.trim(),
+    active: true
   };
-  if (!obj.amount) return toast('請填寫金額', 'err');
-  var id = $('exp_id').value;
+  if (!obj.platform) return toast('請填寫廣告平台', 'err');
+  if (!obj.daily_cost) return toast('請填寫每日金額', 'err');
+  if (!obj.start_date) return toast('請選擇開始日期', 'err');
+  var id = $('adc_id').value;
   if (isDemo) {
     if (id) {
-      var idx = ads.findIndex(function(a) { return String(a.id) === String(id) });
-      if (idx >= 0) Object.assign(ads[idx], obj);
+      var idx = adConfigs.findIndex(function(c) { return String(c.id) === String(id) });
+      if (idx >= 0) { obj.active = adConfigs[idx].active; Object.assign(adConfigs[idx], obj); }
     } else {
       obj.id = 'd' + Date.now();
-      ads.unshift(obj);
+      adConfigs.unshift(obj);
     }
-    demoSave(); closeModal(); renderAll(); toast('廣告記錄已儲存', 'ok');
+    demoSave(); closeModal(); renderAll(); toast('廣告設定已儲存', 'ok');
   } else {
     obj.user_id = userId;
     var req = id
-      ? sb.from('ad_spends').update(obj).eq('id', id)
-      : sb.from('ad_spends').insert(obj);
+      ? sb.from('ad_configs').update(obj).eq('id', id)
+      : sb.from('ad_configs').insert(obj);
     req.then(function(res) {
       if (res.error) return toast('儲存失敗：' + res.error.message, 'err');
-      closeModal(); loadAll(); toast('廣告記錄已儲存', 'ok');
-    }).catch(function(err) {
-      toast('儲存失敗：' + err.message, 'err');
+      closeModal(); loadAll(); toast('廣告設定已儲存', 'ok');
     });
   }
 }
-function deleteExp(id) {
-  confirmAction('確定要刪除此廣告記錄？', function() {
+function toggleAdConfig(id) {
+  var item = adConfigs.filter(function(c) { return String(c.id) === String(id) })[0];
+  if (!item) return;
+  var newActive = !item.active;
+  if (isDemo) {
+    item.active = newActive;
+    demoSave(); renderAll(); toast(newActive ? '已恢復投放' : '已暫停', 'ok');
+  } else {
+    sb.from('ad_configs').update({ active: newActive }).eq('id', id).then(function(res) {
+      if (res.error) return toast(res.error.message, 'err');
+      loadAll(); toast(newActive ? '已恢復投放' : '已暫停', 'ok');
+    });
+  }
+}
+function deleteAdConfig(id) {
+  confirmAction('確定要刪除此廣告設定？', function() {
     if (isDemo) {
-      ads = ads.filter(function(a) { return String(a.id) !== String(id) });
+      adConfigs = adConfigs.filter(function(c) { return String(c.id) !== String(id) });
       demoSave(); renderAll(); toast('已刪除', 'ok');
     } else {
-      sb.from('ad_spends').delete().eq('id', id).then(function(res) {
+      sb.from('ad_configs').delete().eq('id', id).then(function(res) {
         if (res.error) return toast(res.error.message, 'err');
         loadAll(); toast('已刪除', 'ok');
       });
@@ -1494,8 +1622,9 @@ document.addEventListener('click', function(e) {
     case 'deleteAgent': deleteAgent(id); break;
     case 'editCustomer': editCustomer(id); break;
     case 'deleteCustomer': deleteCustomer(id); break;
-    case 'editExp': editExp(id); break;
-    case 'deleteExp': deleteExp(id); break;
+    case 'editAdConfig': editAdConfig(id); break;
+    case 'deleteAdConfig': deleteAdConfig(id); break;
+    case 'toggleAdConfig': toggleAdConfig(id); break;
   }
 });
 
