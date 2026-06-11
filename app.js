@@ -146,18 +146,21 @@ function loadAll() {
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
     sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false }),
-    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r){return r}).catch(function(){return{data:[],error:null}})
   ]).then(function(res) {
     res.forEach(function(r, i) {
-      if (r.error) console.warn('Table load error [' + i + ']:', r.error.message);
+      if (r && r.error) console.warn('Table load error [' + i + ']:', r.error.message);
     });
     products = res[0].data || [];
     agents = res[1].data || [];
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
-    adConfigs = res[5] && res[5].data ? res[5].data : [];
+    adConfigs = (res[5] && res[5].data) ? res[5].data : [];
     renderAll();
+  }).catch(function(err) {
+    console.error('loadAll failed:', err);
+    toast('載入失敗，請重新整理', 'err');
   });
 }
 
@@ -463,6 +466,9 @@ document.addEventListener('click', function(e) {
 
 /* ──── Dashboard ──── */
 function renderDashboard() {
+  try { _renderDashboard() } catch(e) { console.error('renderDashboard error:', e); toast('總覽載入失敗：' + e.message, 'err') }
+}
+function _renderDashboard() {
   var ym = mpGetYM('mpDash');
   var isAll = mpIsAll('mpDash');
   var isYear = mpIsYear('mpDash');
