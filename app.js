@@ -1223,23 +1223,62 @@ function renderAgents() {
     $('agentList').innerHTML = '<div class="empty"><div class="icon">👥</div><p>尚無出單人，點擊上方新增</p></div>';
     return;
   }
-  var h = '<table><tr><th>名稱</th><th>抽成方式</th><th>抽成數值</th><th>訂單數</th><th class="text-right">總利潤貢獻</th><th>備註</th><th>操作</th></tr>';
+  var h = '';
   agents.forEach(function(a) {
-    var agOrders = orders.filter(function(o) { return o.agent_id === a.id && o.status === '已完成' });
-    var totalProfit = 0;
-    agOrders.forEach(function(o) { totalProfit += orderProfit(o).profit });
-    h += '<tr><td>' + esc(a.name) + '</td>' +
-      '<td>' + a.commission_type + '</td>' +
-      '<td>' + (a.commission_type === '百分比' ? fmtP(a.commission_value) : 'NT$' + fmtN(a.commission_value)) + '</td>' +
-      '<td class="text-center">' + agOrders.length + '</td>' +
-      '<td class="text-right ' + (totalProfit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(totalProfit) + '</td>' +
-      '<td>' + esc(a.notes || '') + '</td>' +
-      '<td><div class="act-group">' +
-        '<button class="act-btn edit" data-action="editAgent" data-id="' + a.id + '">編輯</button>' +
-        '<button class="act-btn del" data-action="deleteAgent" data-id="' + a.id + '">刪除</button>' +
-      '</div></td></tr>';
+    var agOrders = orders.filter(function(o) { return String(o.agent_id) === String(a.id) && o.status === '已完成' });
+    var totalProfit = 0, totalComm = 0;
+    agOrders.forEach(function(o) {
+      var p = orderProfit(o);
+      totalProfit += p.profit;
+      totalComm += p.comm;
+    });
+    agOrders.sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || '') });
+    var commLabel = a.commission_type === '百分比' ? fmtP(a.commission_value) : 'NT$' + fmtN(a.commission_value);
+    h += '<div class="card agent-card" style="margin-bottom:8px;padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="toggleAgentDetail" data-id="' + a.id + '">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<span class="prod-arrow" data-agent-arrow="' + a.id + '">▶</span>' +
+          '<strong>' + esc(a.name) + '</strong>' +
+          '<span class="badge blue">' + commLabel + '</span>' +
+          '<span class="text-sm">' + agOrders.length + ' 單</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<span class="text-sm">利潤 <b class="' + (totalProfit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(totalProfit) + '</b></span>' +
+          '<span class="text-sm">抽成 <b class="text-red">NT$' + fmtN(totalComm) + '</b></span>' +
+          '<div class="act-group">' +
+            '<button class="act-btn edit" data-action="editAgent" data-id="' + a.id + '">編輯</button>' +
+            '<button class="act-btn del" data-action="deleteAgent" data-id="' + a.id + '">刪除</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="agent-detail" data-agent-detail="' + a.id + '" style="display:none;margin-top:10px">';
+    if (agOrders.length === 0) {
+      h += '<div class="text-sm" style="color:var(--fg3);padding:8px 0">尚無已完成訂單</div>';
+    } else {
+      h += '<table><tr><th>日期</th><th>商品</th><th class="text-right">利潤</th><th class="text-right">抽成金額</th></tr>';
+      agOrders.forEach(function(o) {
+        var p = orderProfit(o);
+        h += '<tr><td>' + (o.order_date || '') + '</td>' +
+          '<td>' + esc(o.platform || '') + ' ' + esc(o.version || '') + '</td>' +
+          '<td class="text-right ' + (p.profit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(p.profit) + '</td>' +
+          '<td class="text-right text-red">NT$' + fmtN(p.comm) + '</td></tr>';
+      });
+      h += '<tr style="border-top:2px solid var(--bg4);font-weight:700"><td colspan="2">合計</td>' +
+        '<td class="text-right ' + (totalProfit >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(totalProfit) + '</td>' +
+        '<td class="text-right text-red">NT$' + fmtN(totalComm) + '</td></tr>';
+      h += '</table>';
+    }
+    h += '</div></div>';
   });
-  $('agentList').innerHTML = h + '</table>';
+  $('agentList').innerHTML = h;
+}
+function toggleAgentDetail(id) {
+  var detail = document.querySelector('[data-agent-detail="' + id + '"]');
+  var arrow = document.querySelector('[data-agent-arrow="' + id + '"]');
+  if (!detail) return;
+  var open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : '';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
 }
 function openAgentModal(item) {
   $('agentModalTitle').textContent = item ? '編輯出單人' : '新增出單人';
@@ -1655,6 +1694,7 @@ document.addEventListener('click', function(e) {
     case 'editAdConfig': editAdConfig(id); break;
     case 'deleteAdConfig': deleteAdConfig(id); break;
     case 'toggleAdConfig': toggleAdConfig(id); break;
+    case 'toggleAgentDetail': toggleAgentDetail(id); break;
   }
 });
 
