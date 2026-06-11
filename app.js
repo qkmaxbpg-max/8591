@@ -760,6 +760,19 @@ document.addEventListener('focusin', function(e) {
   var inst = cdropInstances[id]; if (!inst || inst.state.open) return;
   cdropOpen(id);
 });
+// Blur — close panel when focus leaves cdrop
+document.addEventListener('focusout', function(e) {
+  var inp = e.target.closest('[data-cdrop-input]');
+  if (!inp) return;
+  var id = inp.getAttribute('data-cdrop-input');
+  var inst = cdropInstances[id]; if (!inst || !inst.state.open) return;
+  setTimeout(function() {
+    var active = document.activeElement;
+    var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
+    if (active && (active === inp || (panel && panel.contains(active)))) return;
+    cdropClose(id);
+  }, 150);
+});
 // Click delegation
 document.addEventListener('click', function(e) {
   var tog = e.target.closest('[data-cdrop-toggle]');
