@@ -225,15 +225,19 @@ function monthAds(ym) {
   return oldTotal + calcAdConfigCost(ym);
 }
 function calcAdConfigCost(ym) {
+  var t = today();
   var mStart = ym + '-01';
   var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
   var mEndDate = new Date(y, m, 0);
   var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
+  if (mEnd > t) mEnd = t;
+  if (mStart > t) return 0;
   var total = 0;
   adConfigs.forEach(function(c) {
     if (!c.active) return;
     var s = c.start_date || '';
     var e = c.end_date || '9999-12-31';
+    if (e > t) e = t;
     if (e < mStart || s > mEnd) return;
     var effStart = s > mStart ? s : mStart;
     var effEnd = e < mEnd ? e : mEnd;
@@ -479,7 +483,7 @@ function renderDashboard() {
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
   var adTotal = isAll
-    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.filter(function(c){return c.active}).reduce(function(s,c){ var sd=c.start_date||today(),ed=c.end_date||today(); return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
+    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.filter(function(c){return c.active}).reduce(function(s,c){ var t=today(),sd=c.start_date||t,ed=c.end_date||t; if(ed>t)ed=t; if(sd>t)return s; return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
     : isYear
       ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
       : monthAds(ym);
@@ -1388,12 +1392,16 @@ function adConfigStatus(c) {
   return { label: '投放中', cls: 'badge green' };
 }
 function adConfigDaysInMonth(c, ym) {
+  var t = today();
   var mStart = ym + '-01';
   var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
   var mEndDate = new Date(y, m, 0);
   var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
+  if (mEnd > t) mEnd = t;
+  if (mStart > t) return 0;
   var s = c.start_date || '';
   var e = c.end_date || '9999-12-31';
+  if (e > t) e = t;
   if (e < mStart || s > mEnd) return 0;
   var effStart = s > mStart ? s : mStart;
   var effEnd = e < mEnd ? e : mEnd;
@@ -1413,10 +1421,13 @@ function renderAds() {
     if (!c.active) return;
     var cost = 0;
     if (isAll) {
-      var s = c.start_date || today();
-      var e = c.end_date || today();
+      var t = today();
+      var s = c.start_date || t;
+      var e = c.end_date || t;
+      if (e > t) e = t;
+      if (s > t) return;
       var d1 = new Date(s); var d2 = new Date(e);
-      cost = (Math.round((d2 - d1) / 86400000) + 1) * (c.daily_cost || 0);
+      cost = Math.max(0, Math.round((d2 - d1) / 86400000) + 1) * (c.daily_cost || 0);
     } else if (isYear) {
       for (var mi = 1; mi <= 12; mi++) {
         var mm = mi < 10 ? '0' + mi : '' + mi;
