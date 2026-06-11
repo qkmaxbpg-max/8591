@@ -145,8 +145,7 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false }),
-    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r){return r}).catch(function(){return{data:[],error:null}})
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
   ]).then(function(res) {
     res.forEach(function(r, i) {
       if (r && r.error) console.warn('Table load error [' + i + ']:', r.error.message);
@@ -156,8 +155,16 @@ function loadAll() {
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
-    adConfigs = (res[5] && res[5].data) ? res[5].data : [];
-    renderAll();
+    // ad_configs loaded separately to avoid breaking main data
+    try {
+      sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
+        adConfigs = (r2 && r2.data) ? r2.data : [];
+        renderAll();
+      });
+    } catch(e) {
+      adConfigs = [];
+      renderAll();
+    }
   }).catch(function(err) {
     console.error('loadAll failed:', err);
     toast('載入失敗，請重新整理', 'err');
