@@ -1507,7 +1507,19 @@ function toggleAdcEnd() {
 function openAdConfigModal(item) {
   $('adConfigModalTitle').textContent = item ? '編輯廣告設定' : '新增廣告設定';
   $('adc_id').value = item ? item.id : '';
-  $('adc_platform').value = item ? (item.platform || '') : '';
+  var platItems = ['8591','Dcard','Facebook','Instagram','蝦皮','Google'].map(function(p) {
+    return { value: p, label: p };
+  });
+  cdropInit('adc_platformDrop', {
+    items: platItems,
+    value: item ? (item.platform || '') : '',
+    placeholder: '搜尋或選擇平台...',
+    onSelect: function(v) { $('adc_platform').value = v; }
+  });
+  if (item && item.platform) {
+    $('adc_platform').value = item.platform;
+    cdropSetValue('adc_platformDrop', item.platform);
+  }
   $('adc_daily').value = item ? item.daily_cost : '';
   dpInit('adc_start', { value: item ? item.start_date : today() });
   var noEnd = item ? !item.end_date : false;
@@ -1525,7 +1537,7 @@ function editAdConfig(id) {
 function saveAdConfig() {
   var noEnd = $('adc_noend').checked;
   var obj = {
-    platform: $('adc_platform').value.trim(),
+    platform: ($('adc_platform').value || (cdropInstances['adc_platformDrop'] ? cdropInstances['adc_platformDrop'].state.text : '')).trim(),
     daily_cost: Number($('adc_daily').value) || 0,
     start_date: dpGetVal('adc_start'),
     end_date: noEnd ? null : (dpGetVal('adc_end') || null),
