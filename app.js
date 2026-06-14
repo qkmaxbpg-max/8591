@@ -218,10 +218,13 @@ function orderProfit(o) {
   return { rev: rev, cost: cost, fee: fee, gross: gross, comm: comm, profit: gross - comm };
 }
 function genOrderNo() {
-  var d = today().replace(/-/g, '');
-  var todayOrders = orders.filter(function(o) { return (o.order_no || '').indexOf(d) === 0 });
-  var seq = todayOrders.length + 1;
-  return d + '-' + (seq < 10 ? '0' + seq : seq);
+  var max = 0;
+  orders.forEach(function(o) {
+    var m = (o.order_no || '').match(/^MWJ-(\d+)$/);
+    if (m) { var n = Number(m[1]); if (n > max) max = n; }
+  });
+  var seq = max + 1;
+  return 'MWJ-' + String(seq).padStart(5, '0');
 }
 function monthAds(ym) {
   var oldTotal = ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym })
@@ -883,7 +886,7 @@ function renderOrders() {
     $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
     return;
   }
-  var h = '<table><tr><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th>操作</th></tr>';
+  var h = '<table><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th>操作</th></tr>';
   list.forEach(function(o) {
     var p = orderProfit(o);
     var expiry = o.expiry_date || '';
@@ -893,7 +896,8 @@ function renderOrders() {
       if (diff < 0) expiryWarn = ' text-red';
       else if (diff < 7) expiryWarn = ' text-yellow';
     }
-    h += '<tr><td>' + (o.order_date || '') + '</td>' +
+    h += '<tr><td style="font-size:.8rem;white-space:nowrap">' + esc(o.order_no || '') + '</td>' +
+      '<td>' + (o.order_date || '') + '</td>' +
       '<td>' + channelBadge(o.channel) + '</td>' +
       '<td>' + esc(getAgentName(o.agent_id)) + '</td>' +
       '<td>' + esc(getCustomerName(o.customer_id)) + '</td>' +
@@ -2413,14 +2417,17 @@ function importOcrOrders() {
   $('btnOcrImport').disabled = true;
   $('btnOcrImport').textContent = '匯入中...';
 
+  var ocrBase = 0;
+  orders.forEach(function(o) { var m = (o.order_no || '').match(/^MWJ-(\d+)$/); if (m) { var n = Number(m[1]); if (n > ocrBase) ocrBase = n; } });
   var rows = ocrParsedOrders.map(function(o, i) {
     var d = o.order_date || today();
     var costInput = $('ocrCost' + i);
     var cost = costInput ? Number(costInput.value) || 0 : 0;
+    ocrBase++;
     return {
       user_id: userId,
       order_date: d,
-      order_no: d.replace(/-/g, '') + '-' + String(i + 1).padStart(2, '0'),
+      order_no: 'MWJ-' + String(ocrBase).padStart(5, '0'),
       channel: '8591',
       status: o.status || '已完成',
       platform: o.platform || '',
