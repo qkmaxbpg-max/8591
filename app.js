@@ -157,7 +157,7 @@ function loadAll() {
     renderAll();
     // ad_configs loaded separately — re-render ads tab when ready
     sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
-      if (r2 && r2.data) { adConfigs = r2.data; renderAds(); }
+      if (r2 && r2.data) { adConfigs = r2.data; renderAds(); renderDashboard(); }
     }).catch(function() { adConfigs = []; });
   }).catch(function(err) {
     console.error('loadAll failed:', err);
