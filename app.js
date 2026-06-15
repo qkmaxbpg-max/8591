@@ -959,24 +959,34 @@ function onChannelChange() {
 }
 function renderPersonalSelect(selected) {
   var presets = getPersonalPresets();
-  var sel = selected || $('om_personalSelect').value || '';
-  var h = '<option value="">— 選擇商品 —</option>';
-  presets.forEach(function(p) {
-    h += '<option value="' + esc(p) + '"' + (sel === p ? ' selected' : '') + '>' + esc(p) + '</option>';
+  var sel = selected || $('om_manualName').value || '';
+  var prItems = presets.map(function(p) {
+    return { value: p, label: p, icon: p.charAt(0), iconCls: 'accent' };
   });
-  h += '<option value="__custom__"' + (sel === '__custom__' ? ' selected' : '') + '>其他（自訂）</option>';
-  $('om_personalSelect').innerHTML = h;
-  $('om_customNameGroup').style.display = sel === '__custom__' ? '' : 'none';
+  cdropInit('om_personalDrop', {
+    items: prItems, placeholder: '搜尋或選擇商品...', value: sel,
+    allowCreate: true,
+    onCreate: function(name) {
+      addPersonalPreset(name);
+      $('om_manualName').value = name;
+      $('om_product').value = '';
+      var newItems = cdropInstances['om_personalDrop'].state.items.slice();
+      newItems.push({ value: name, label: name, icon: name.charAt(0), iconCls: 'accent' });
+      cdropInstances['om_personalDrop'].state.items = newItems;
+      cdropInstances['om_personalDrop'].state.value = name;
+      cdropInstances['om_personalDrop'].state.open = false;
+      cdropRender('om_personalDrop');
+      calcOrderPreview();
+    },
+    onSelect: function(v) {
+      $('om_manualName').value = v;
+      $('om_product').value = '';
+      calcOrderPreview();
+    }
+  });
 }
 function onPersonalSelect() {
-  var val = $('om_personalSelect').value;
-  $('om_customNameGroup').style.display = val === '__custom__' ? '' : 'none';
-  if (val && val !== '__custom__') {
-    $('om_manualName').value = val;
-    $('om_product').value = '';
-  } else if (val === '__custom__') {
-    $('om_manualName').value = '';
-  }
+  calcOrderPreview();
   calcOrderPreview();
 }
 function openOrderModal(item) {
@@ -1059,13 +1069,7 @@ function openOrderModal(item) {
 
   // Set personal select when editing a personal-channel order
   if (item && (item.channel || '8591') === '個人' && !item.product_id) {
-    var presets = getPersonalPresets();
-    var editName = item.platform || '';
-    if (presets.indexOf(editName) >= 0) {
-      renderPersonalSelect(editName);
-    } else {
-      renderPersonalSelect('__custom__');
-    }
+    renderPersonalSelect(item.platform || '');
   }
 
   onChannelChange();
@@ -1176,7 +1180,7 @@ function saveOrder() {
     channel: ch,
     status: $('om_status').value,
     product_id: pid || null,
-    platform: p ? p.platform : (ch === '個人' && $('om_personalSelect').value && $('om_personalSelect').value !== '__custom__' ? $('om_personalSelect').value : manualName),
+    platform: p ? p.platform : manualName,
     version: p ? p.version : '',
     duration: p ? p.duration : '',
     qty: Number($('om_qty').value) || 1,
@@ -1191,7 +1195,6 @@ function saveOrder() {
     notes: $('om_notes').value.trim()
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
-  if (ch === '個人' && $('om_personalSelect').value === '__custom__' && manualName) addPersonalPreset(manualName);
 
   var id = $('om_id').value;
   if (id) obj.order_no = orders.filter(function(o) { return String(o.id) === String(id) })[0].order_no;
