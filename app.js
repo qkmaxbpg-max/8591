@@ -902,7 +902,7 @@ function renderOrders() {
     $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
     return;
   }
-  var h = '<table><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th>操作</th></tr>';
+  var h = '<table style="min-width:1100px"><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th>操作</th></tr>';
   list.forEach(function(o) {
     var p = orderProfit(o);
     var expiry = o.expiry_date || '';
