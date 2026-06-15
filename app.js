@@ -759,7 +759,9 @@ function cdropRenderPanel(id) {
   var s = inst.state, o = inst.opts;
   var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
   if (!panel) return;
-  var q = s.text.toLowerCase();
+  var selItem = s.value ? s.items.filter(function(it) { return String(it.value) === String(s.value) })[0] : null;
+  var isSelectedLabel = selItem && s.text === selItem.label;
+  var q = isSelectedLabel ? '' : s.text.toLowerCase();
   var filtered = q ? s.items.filter(function(it) {
     return (it.label + (it.sub || '')).toLowerCase().indexOf(q) >= 0;
   }) : s.items;
@@ -804,6 +806,10 @@ function cdropSetValue(id, val) {
   if (inp) inp.value = inst.state.text;
 }
 
+// Prevent panel clicks from stealing focus (fixes slow-device race condition)
+document.addEventListener('mousedown', function(e) {
+  if (e.target.closest('.cdrop-panel') || e.target.closest('.cdrop-arrow')) e.preventDefault();
+});
 // Typing — only update panel, never touch input
 document.addEventListener('input', function(e) {
   var inp = e.target.closest('[data-cdrop-input]');
@@ -815,13 +821,14 @@ document.addEventListener('input', function(e) {
   if (!inst.state.open) cdropOpen(id);
   else cdropRenderPanel(id);
 });
-// Focus — open panel without rebuilding input
+// Focus — open panel and select text so user can type to filter
 document.addEventListener('focusin', function(e) {
   var inp = e.target.closest('[data-cdrop-input]');
   if (!inp) return;
   var id = inp.getAttribute('data-cdrop-input');
   var inst = cdropInstances[id]; if (!inst || inst.state.open) return;
   cdropOpen(id);
+  if (inp.value) inp.select();
 });
 // Blur — close panel when focus leaves cdrop
 document.addEventListener('focusout', function(e) {
@@ -975,7 +982,7 @@ function renderPersonalSelect(selected) {
       cdropInstances['om_personalDrop'].state.items = newItems;
       cdropInstances['om_personalDrop'].state.value = name;
       cdropInstances['om_personalDrop'].state.open = false;
-      cdropRender('om_personalDrop');
+      cdropRenderPanel('om_personalDrop');
       calcOrderPreview();
     },
     onSelect: function(v) {
@@ -1034,7 +1041,7 @@ function openOrderModal(item) {
           cdropInstances['om_customerDrop'].state.items = newItems;
           cdropInstances['om_customerDrop'].state.value = String(newId);
           cdropInstances['om_customerDrop'].state.open = false;
-          cdropRender('om_customerDrop');
+          cdropRenderPanel('om_customerDrop');
         }
       });
     },
