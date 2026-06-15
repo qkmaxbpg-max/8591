@@ -536,16 +536,22 @@ function _renderDashboard() {
   $('platformChart').innerHTML = chartHtml;
 
   // Channel comparison
-  var ch8591 = { rev: 0, prof: 0, cnt: 0 }, chPersonal = { rev: 0, prof: 0, cnt: 0 };
+  var ch8591 = { rev: 0, prof: 0, cnt: 0 }, chShopee = { rev: 0, prof: 0, cnt: 0 }, chPersonal = { rev: 0, prof: 0, cnt: 0 };
   completed.forEach(function(o) {
     var p = orderProfit(o);
-    var t = o.channel === '個人' ? chPersonal : ch8591;
+    var t = o.channel === '蝦皮' ? chShopee : o.channel === '個人' ? chPersonal : ch8591;
     t.rev += p.rev; t.prof += p.profit; t.cnt++;
   });
-  $('channelStats').innerHTML = '<table><tr><th>管道</th><th class="text-right">訂單數</th><th class="text-right">營收</th><th class="text-right">利潤</th><th class="text-right">利潤率</th></tr>' +
-    '<tr><td><span class="badge pending">8591</span></td><td class="text-right">' + ch8591.cnt + '</td><td class="text-right">NT$' + fmtN(ch8591.rev) + '</td><td class="text-right text-green">NT$' + fmtN(ch8591.prof) + '</td><td class="text-right">' + fmtP(ch8591.rev > 0 ? ch8591.prof / ch8591.rev : 0) + '</td></tr>' +
-    '<tr><td><span class="badge ok">個人</span></td><td class="text-right">' + chPersonal.cnt + '</td><td class="text-right">NT$' + fmtN(chPersonal.rev) + '</td><td class="text-right text-green">NT$' + fmtN(chPersonal.prof) + '</td><td class="text-right">' + fmtP(chPersonal.rev > 0 ? chPersonal.prof / chPersonal.rev : 0) + '</td></tr>' +
-    '</table>';
+  var chRows = [
+    { badge: 'pending', name: '8591', d: ch8591 },
+    { badge: '', name: '蝦皮', d: chShopee, style: 'background:var(--orange);color:#fff' },
+    { badge: 'ok', name: '個人', d: chPersonal }
+  ];
+  var chHtml = '<table><tr><th>管道</th><th class="text-right">訂單數</th><th class="text-right">營收</th><th class="text-right">利潤</th><th class="text-right">利潤率</th></tr>';
+  chRows.forEach(function(r) {
+    chHtml += '<tr><td><span class="badge ' + r.badge + '"' + (r.style ? ' style="' + r.style + '"' : '') + '>' + r.name + '</span></td><td class="text-right">' + r.d.cnt + '</td><td class="text-right">NT$' + fmtN(r.d.rev) + '</td><td class="text-right ' + (r.d.prof >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(r.d.prof) + '</td><td class="text-right">' + fmtP(r.d.rev > 0 ? r.d.prof / r.d.rev : 0) + '</td></tr>';
+  });
+  $('channelStats').innerHTML = chHtml + '</table>';
 
   // Recent orders (filtered by period)
   var recent = filtered.slice(0, 8);
