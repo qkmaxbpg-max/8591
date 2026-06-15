@@ -1161,7 +1161,8 @@ function saveOrder() {
   var agId = $('om_agent').value || null;
   var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var ch = $('om_channel').value;
-  var manualName = $('om_manualName').value.trim();
+  var personalInst = cdropInstances['om_personalDrop'];
+  var manualName = $('om_manualName').value.trim() || (personalInst ? (personalInst.state.value || personalInst.state.text || '').trim() : '');
   var custId = $('om_customer').value || null;
   // If customer dropdown has free text but no ID, resolve by name
   var custInst = cdropInstances['om_customerDrop'];
