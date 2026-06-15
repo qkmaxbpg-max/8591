@@ -603,7 +603,10 @@ function renderProducts() {
   });
   var html = '';
   Object.keys(groups).sort().forEach(function(plat) {
-    var items = groups[plat];
+    var items = groups[plat].slice().sort(function(a, b) {
+      if (a.version !== b.version) return a.version < b.version ? -1 : 1;
+      return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
+    });
     var isOpen = expandedPlatforms[plat] !== false;
     var activeCount = items.filter(function(p) { return p.status === '啟用' }).length;
     html += '<div class="prod-group card">' +
