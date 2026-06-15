@@ -2,6 +2,7 @@
 var SUPABASE_URL='https://hpajiexvcmkidbgreaqy.supabase.co';
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwYWppZXh2Y21raWRiZ3JlYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTY2NTQsImV4cCI6MjA5NDU5MjY1NH0.ZIxx-cJRHxLAv-TlPpjvFGBndzs-GE9ptZENh81AQQQ';
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
+var SHOPEE_FEE = 0.10; // 蝦皮預設 10%
 var sb = null, userId = null, isDemo = false;
 var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [];
 
@@ -204,7 +205,9 @@ function confirmAction(msg, cb) {
 
 /* ──── Calc helpers ──── */
 function channelFee(channel, unitPrice) {
-  return channel === '8591' ? unitPrice * PLATFORM_FEE : 0;
+  if (channel === '8591') return unitPrice * PLATFORM_FEE;
+  if (channel === '蝦皮') return unitPrice * SHOPEE_FEE;
+  return 0;
 }
 function calcCommission(gross, commType, commVal) {
   return commType === '百分比' ? gross * commVal : commVal;
@@ -574,7 +577,9 @@ function statusBadge(s) {
   return '<span class="badge ' + cls + '">' + s + '</span>';
 }
 function channelBadge(ch) {
-  return ch === '個人' ? '<span class="badge ok">個人</span>' : '<span class="badge pending">8591</span>';
+  if (ch === '個人') return '<span class="badge ok">個人</span>';
+  if (ch === '蝦皮') return '<span class="badge" style="background:var(--orange);color:#fff">蝦皮</span>';
+  return '<span class="badge pending">8591</span>';
 }
 
 /* ──── Products (grouped view) ──── */
@@ -608,16 +613,19 @@ function renderProducts() {
         '<span class="prod-count">' + activeCount + '/' + items.length + ' 啟用</span>' +
       '</div>';
     if (isOpen) {
-      html += '<table class="prod-table"><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">售價</th><th class="text-right">8591淨利</th><th class="text-right">個人淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr>';
+      html += '<table class="prod-table"><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr>';
       items.forEach(function(p) {
         var fee8591 = p.price * PLATFORM_FEE;
         var prof8591 = p.price - p.cost - fee8591;
-        var profPersonal = p.price - p.cost;
+        var sp = p.shopee_price || 0;
+        var feeShopee = sp * SHOPEE_FEE;
+        var profShopee = sp > 0 ? sp - p.cost - feeShopee : 0;
         html += '<tr><td>' + esc(p.version) + '</td><td>' + esc(p.duration) + '</td>' +
           '<td class="text-right">' + fmtN(p.cost) + '</td>' +
           '<td class="text-right">' + fmtN(p.price) + '</td>' +
           '<td class="text-right ' + (prof8591 >= 0 ? 'text-green' : 'text-red') + '">' + fmtN(prof8591) + '</td>' +
-          '<td class="text-right text-green">' + fmtN(profPersonal) + '</td>' +
+          '<td class="text-right">' + (sp > 0 ? fmtN(sp) : '-') + '</td>' +
+          '<td class="text-right ' + (profShopee >= 0 ? 'text-green' : 'text-red') + '">' + (sp > 0 ? fmtN(profShopee) : '-') + '</td>' +
           '<td>' + (p.status === '啟用' ? '<span class="badge active">啟用</span>' : '<span class="badge inactive">停用</span>') + '</td>' +
           '<td class="text-sm">' + esc(p.required_info || '') + '</td>' +
           '<td><div class="act-group">' +
@@ -651,22 +659,26 @@ function openProductModal(item) {
   $('pm_duration').value = item ? item.duration : '';
   $('pm_cost').value = item ? item.cost : '';
   $('pm_price').value = item ? item.price : '';
+  $('pm_shopeePrice').value = item ? (item.shopee_price || '') : '';
   $('pm_status').value = item ? item.status : '啟用';
   $('pm_reqInfo').value = item ? (item.required_info || '') : '';
   $('pm_notes').value = item ? (item.notes || '') : '';
   updateProdPreview();
-  $('pm_cost').oninput = $('pm_price').oninput = updateProdPreview;
+  $('pm_cost').oninput = $('pm_price').oninput = $('pm_shopeePrice').oninput = updateProdPreview;
   openModal('productModal');
 }
 function updateProdPreview() {
   var cost = Number($('pm_cost').value) || 0;
   var price = Number($('pm_price').value) || 0;
+  var sp = Number($('pm_shopeePrice').value) || 0;
   var fee8591 = price * PLATFORM_FEE;
   var prof8591 = price - cost - fee8591;
-  var profPersonal = price - cost;
-  $('prodPreview').innerHTML =
-    '<div class="row"><span class="lbl">8591 淨利</span><span class="val ' + (prof8591 >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(prof8591) + '（手續費 NT$' + fmtN(fee8591) + '）</span></div>' +
-    '<div class="row"><span class="lbl">個人 淨利</span><span class="val text-green highlight">NT$' + fmtN(profPersonal) + '</span></div>';
+  var feeShopee = sp * SHOPEE_FEE;
+  var profShopee = sp - cost - feeShopee;
+  var h = '<div class="row"><span class="lbl">8591 淨利</span><span class="val ' + (prof8591 >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(prof8591) + '（手續費 ' + (PLATFORM_FEE * 100) + '% = NT$' + fmtN(fee8591) + '）</span></div>';
+  if (sp > 0) h += '<div class="row"><span class="lbl">蝦皮 淨利</span><span class="val ' + (profShopee >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(profShopee) + '（手續費 ' + (SHOPEE_FEE * 100) + '% = NT$' + fmtN(feeShopee) + '）</span></div>';
+  h += '<div class="row"><span class="lbl">個人 淨利</span><span class="val text-green highlight">NT$' + fmtN(price - cost) + '</span></div>';
+  $('prodPreview').innerHTML = h;
 }
 function editProduct(id) {
   var item = products.filter(function(p) { return String(p.id) === String(id) })[0];
@@ -680,6 +692,7 @@ function saveProduct() {
     duration: $('pm_duration').value.trim(),
     cost: Number($('pm_cost').value) || 0,
     price: Number($('pm_price').value) || 0,
+    shopee_price: Number($('pm_shopeePrice').value) || 0,
     fee_type: '百分比',
     fee_value: PLATFORM_FEE,
     status: $('pm_status').value,
@@ -932,6 +945,13 @@ function onChannelChange() {
   $('om_manualGroup').style.display = isPersonal ? '' : 'none';
   $('om_productGroup').style.display = '';
   if (isPersonal) renderPersonalSelect();
+  // Re-fill price based on channel
+  var pid = $('om_product').value;
+  var p = pid ? products.filter(function(x) { return String(x.id) === String(pid) })[0] : null;
+  if (p) {
+    var usePrice = (ch === '蝦皮' && p.shopee_price) ? p.shopee_price : p.price;
+    $('om_unitPrice').value = usePrice;
+  }
   calcOrderPreview();
 }
 function renderPersonalSelect(selected) {
@@ -1012,7 +1032,8 @@ function openOrderModal(item) {
   // Product custom dropdown
   var prItems = [];
   products.filter(function(p) { return p.status === '啟用' }).forEach(function(p) {
-    prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(p.price) });
+    var showPrice = p.price;
+    prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(showPrice) });
   });
   cdropInit('om_productDrop', {
     items: prItems, placeholder: '搜尋或選擇商品...', value: item ? String(item.product_id || '') : '',
@@ -1050,7 +1071,9 @@ function onProductSelect() {
   var pid = $('om_product').value;
   var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
   if (p) {
-    $('om_unitPrice').value = p.price;
+    var ch = $('om_channel').value;
+    var usePrice = (ch === '蝦皮' && p.shopee_price) ? p.shopee_price : p.price;
+    $('om_unitPrice').value = usePrice;
     $('om_unitCost').value = p.cost;
     var dur = p.duration || '';
     var months = parseInt(dur) || 0;
@@ -1153,7 +1176,7 @@ function saveOrder() {
     unit_price: Number($('om_unitPrice').value) || 0,
     unit_cost: Number($('om_unitCost').value) || 0,
     fee_type: '百分比',
-    fee_value: ch === '8591' ? PLATFORM_FEE : 0,
+    fee_value: ch === '8591' ? PLATFORM_FEE : ch === '蝦皮' ? SHOPEE_FEE : 0,
     commission_type: ag ? ag.commission_type : '百分比',
     commission_value: ag ? ag.commission_value : 0,
     expiry_date: dpGetVal('om_expiry') || null,
