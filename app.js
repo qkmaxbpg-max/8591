@@ -1034,7 +1034,11 @@ function openOrderModal(item) {
 
   // Product custom dropdown
   var prItems = [];
-  products.filter(function(p) { return p.status === '啟用' }).forEach(function(p) {
+  products.filter(function(p) { return p.status === '啟用' }).slice().sort(function(a, b) {
+    if (a.platform !== b.platform) return a.platform < b.platform ? -1 : 1;
+    if (a.version !== b.version) return a.version < b.version ? -1 : 1;
+    return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
+  }).forEach(function(p) {
     var showPrice = p.price;
     prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(showPrice) });
   });
