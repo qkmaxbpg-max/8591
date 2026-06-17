@@ -505,8 +505,14 @@ function _renderDashboard() {
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
 
+  var td = today();
+  var todayCompleted = orders.filter(function(o) { return o.status === '已完成' && o.order_date === td });
+  var todayRev = 0, todayProf = 0;
+  todayCompleted.forEach(function(o) { var p = orderProfit(o); todayRev += p.rev; todayProf += p.profit });
+
   $('statCards').innerHTML =
-    statCard('訂單數', completed.length, '', 'blue') +
+    statCard('本日營收', 'NT$' + fmtN(todayRev), todayCompleted.length + ' 筆訂單', 'blue') +
+    statCard('訂單數', completed.length, '', '') +
     statCard('總營收', 'NT$' + fmtN(totalRev), '') +
     statCard('訂單利潤', 'NT$' + fmtN(orderProf), '含手續費+抽成', orderProf >= 0 ? 'green' : 'red') +
     statCard('廣告費', 'NT$' + fmtN(adTotal), '', adTotal > 0 ? 'red' : '') +
@@ -919,6 +925,7 @@ function renderOrders() {
     }
     return true;
   });
+  list.sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || '') || b.id - a.id });
   if (list.length === 0) {
     $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
     return;
