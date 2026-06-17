@@ -95,7 +95,8 @@ select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .cdrop-create:hover{background:var(--accent-dim)}
 
 /* Top Bar */
-#topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg1);border-bottom:1px solid var(--bg3);position:sticky;top:0;z-index:100}
+#stickyHeader{position:sticky;top:0;z-index:100;background:var(--bg1)}
+#topBar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg1);border-bottom:1px solid var(--bg3)}
 .top-left{display:flex;align-items:center;gap:8px}
 .logo{font-size:1.3rem}
 .app-title{font-weight:700;font-size:1.1rem}

@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=50">
+<link rel="stylesheet" href="style.css?v=51">
 </head>
 <body>
 
@@ -42,6 +42,7 @@
 <!-- Main App -->
 <div id="app" class="page" style="display:none">
 
+  <div id="stickyHeader">
   <!-- Top Bar -->
   <header id="topBar">
     <div class="top-left">
@@ -66,6 +67,7 @@
     <button class="tab" data-tab="customers" onclick="switchTab('customers')">客戶</button>
     <button class="tab" data-tab="ads" onclick="switchTab('ads')">廣告</button>
   </nav>
+  </div>
 
   <!-- Subscription Expiry Alert Bar -->
   <div id="expiryAlertBar" class="expiry-alert-bar" style="display:none"></div>
