@@ -511,7 +511,7 @@ function _renderDashboard() {
   todayCompleted.forEach(function(o) { var p = orderProfit(o); todayRev += p.rev; todayProf += p.profit });
 
   $('statCards').innerHTML =
-    statCard('本日營收', 'NT$' + fmtN(todayRev), todayCompleted.length + ' 筆訂單', 'blue') +
+    statCard('本日淨利', 'NT$' + fmtN(todayProf), todayCompleted.length + ' 筆訂單', todayProf >= 0 ? 'green' : 'red') +
     statCard('訂單數', completed.length, '', '') +
     statCard('總營收', 'NT$' + fmtN(totalRev), '') +
     statCard('訂單利潤', 'NT$' + fmtN(orderProf), '含手續費+抽成', orderProf >= 0 ? 'green' : 'red') +
