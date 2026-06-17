@@ -659,8 +659,6 @@ function renderProducts() {
     html += '</div>';
   });
   $('productList').innerHTML = html;
-  var gh = document.querySelector('.prod-group-head');
-  if (gh) document.documentElement.style.setProperty('--group-head-h', gh.offsetHeight + 'px');
   updatePlatformList();
 }
 function togglePlatform(plat) {
