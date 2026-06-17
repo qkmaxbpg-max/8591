@@ -612,7 +612,11 @@ function renderProducts() {
   var html = '';
   Object.keys(groups).sort().forEach(function(plat) {
     var items = groups[plat].slice().sort(function(a, b) {
-      if (a.version !== b.version) return a.version < b.version ? -1 : 1;
+      if (a.version !== b.version) {
+        var na = parseInt(a.version) || 0, nb = parseInt(b.version) || 0;
+        if (na && nb) return na - nb;
+        return a.version < b.version ? -1 : 1;
+      }
       return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
     });
     var isOpen = expandedPlatforms[plat] !== false;
@@ -1063,7 +1067,11 @@ function openOrderModal(item) {
   var prItems = [];
   products.filter(function(p) { return p.status === '啟用' }).slice().sort(function(a, b) {
     if (a.platform !== b.platform) return a.platform < b.platform ? -1 : 1;
-    if (a.version !== b.version) return a.version < b.version ? -1 : 1;
+    if (a.version !== b.version) {
+      var na = parseInt(a.version) || 0, nb = parseInt(b.version) || 0;
+      if (na && nb) return na - nb;
+      return a.version < b.version ? -1 : 1;
+    }
     return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
   }).forEach(function(p) {
     var showPrice = p.price;
