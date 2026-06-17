@@ -167,6 +167,8 @@ function loadAll() {
 }
 
 function renderAll() {
+  var sh = $('stickyHeader');
+  if (sh) document.documentElement.style.setProperty('--sticky-top', sh.offsetHeight + 'px');
   renderDashboard();
   renderProducts();
   renderOrders();
@@ -622,7 +624,7 @@ function renderProducts() {
         '<span class="prod-count">' + activeCount + '/' + items.length + ' 啟用</span>' +
       '</div>';
     if (isOpen) {
-      html += '<table class="prod-table"><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr>';
+      html += '<table class="prod-table"><thead><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr></thead><tbody>';
       items.forEach(function(p) {
         var fee8591 = p.price * PLATFORM_FEE;
         var prof8591 = p.price - p.cost - fee8591;
@@ -642,11 +644,13 @@ function renderProducts() {
             '<button class="act-btn del" data-action="deleteProduct" data-id="' + p.id + '">刪除</button>' +
           '</div></td></tr>';
       });
-      html += '</table>';
+      html += '</tbody></table>';
     }
     html += '</div>';
   });
   $('productList').innerHTML = html;
+  var gh = document.querySelector('.prod-group-head');
+  if (gh) document.documentElement.style.setProperty('--group-head-h', gh.offsetHeight + 'px');
   updatePlatformList();
 }
 function togglePlatform(plat) {
