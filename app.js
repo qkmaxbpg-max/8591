@@ -1961,6 +1961,12 @@ function renewSeat(accountId, seatNum, oldOrderId) {
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
       cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
+      var pi = cdropInstances['om_productDrop'].state.items.filter(function(it) { return String(it.value) === String(oldOrder.product_id) })[0];
+      if (pi) {
+        cdropInstances['om_productDrop'].state.text = pi.label;
+        var pinp = document.querySelector('[data-cdrop-input="om_productDrop"]');
+        if (pinp) pinp.value = pi.label;
+      }
       cdropRenderPanel('om_productDrop');
       var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
       if (prod) {
@@ -2015,6 +2021,12 @@ function renewOrder(oldOrderId) {
   if (oldOrder.product_id) {
     $('om_product').value = oldOrder.product_id;
     cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
+    var pi = cdropInstances['om_productDrop'].state.items.filter(function(it) { return String(it.value) === String(oldOrder.product_id) })[0];
+    if (pi) {
+      cdropInstances['om_productDrop'].state.text = pi.label;
+      var pinp = document.querySelector('[data-cdrop-input="om_productDrop"]');
+      if (pinp) pinp.value = pi.label;
+    }
     cdropRenderPanel('om_productDrop');
     var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
     if (prod) {
@@ -2027,6 +2039,11 @@ function renewOrder(oldOrderId) {
         var d = new Date(expiryBase);
         d.setMonth(d.getMonth() + months);
         dpSetVal('om_expiry', d.toISOString().slice(0, 10));
+      }
+      var accts = serviceAccounts.filter(function(a) { return a.platform === prod.platform && a.status === '啟用' });
+      if (accts.length > 0) {
+        $('om_seatGroup').style.display = '';
+        initSvcAcctDrop(accts);
       }
     }
   }
