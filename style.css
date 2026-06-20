@@ -286,6 +286,33 @@ tr:hover td{background:var(--bg2)}
 .hint{font-size:.75rem;color:var(--fg2);margin-top:4px}
 .hint a{color:var(--accent)}
 
+/* Account Manager Table */
+.acct-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.acct-table th{text-align:left;padding:6px 10px;background:var(--bg3);color:var(--fg2);font-weight:500}
+.acct-table td{padding:6px 10px;border-bottom:1px solid var(--bg3)}
+
+/* Seat Grid (Subscription Page) */
+.seat-grid{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.seat-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:.82rem}
+.seat-row.occupied{background:var(--green-dim);border-left:3px solid var(--green)}
+.seat-row.expired{background:var(--yellow-dim);border-left:3px solid var(--yellow)}
+.seat-row.empty{background:var(--bg3);border-left:3px solid var(--fg3)}
+.seat-num{font-weight:600;min-width:60px}
+.seat-info{flex:1}
+.seat-customer{font-weight:500}
+.seat-expiry{font-size:.75rem;color:var(--fg2);margin-top:2px}
+.seat-actions{display:flex;gap:4px}
+.seat-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:500}
+.seat-badge.green{background:var(--green-dim);color:var(--green)}
+.seat-badge.yellow{background:var(--yellow-dim);color:var(--yellow)}
+.seat-badge.grey{background:var(--bg4);color:var(--fg3)}
+.acct-card{background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.acct-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg3);cursor:pointer;user-select:none}
+.acct-card-head:hover{background:var(--bg4)}
+.acct-card-title{font-weight:600;font-size:.9rem}
+.acct-card-sub{font-size:.78rem;color:var(--fg2)}
+.acct-card-body{padding:12px 16px}
+
 /* Import Tabs */
 .import-tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--bg2);border-radius:var(--radius-sm);padding:3px}
 .import-tab{flex:1;padding:8px;border:none;background:transparent;color:var(--fg2);font-size:.85rem;font-weight:500;border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition)}
@@ -380,6 +407,8 @@ tr:hover td{background:var(--bg2)}
 .subs-group-count{font-size:.8rem;color:var(--fg2);margin-left:auto}
 .subs-group-body{padding:0 8px 8px}
 .subs-group.collapsed .subs-group-body{display:none}
+.acct-card.collapsed .acct-card-body{display:none}
+.acct-card.collapsed .subs-group-arrow{transform:rotate(-90deg)}
 .subs-group-body .sub-card{margin-bottom:6px}
 
 /* Dashboard expiry section */

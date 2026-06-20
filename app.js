@@ -4,7 +4,7 @@ var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.10; // 蝦皮預設 10%
 var sb = null, userId = null, isDemo = false;
-var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [];
+var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [], serviceAccounts = [];
 
 /* 個人管道預設商品 */
 var PERSONAL_PRESETS_DEFAULT = ['原神','崩鐵','鳴潮','絕區零','傳說','抖音','代付'];
@@ -136,6 +136,7 @@ function demoSave() {
   localStorage.setItem('proxy-demo-orders', JSON.stringify(orders));
   localStorage.setItem('proxy-demo-ads', JSON.stringify(ads));
   localStorage.setItem('proxy-demo-adconfigs', JSON.stringify(adConfigs));
+  localStorage.setItem('proxy-demo-svcaccounts', JSON.stringify(serviceAccounts));
 }
 
 function loadAll() {
@@ -145,7 +146,8 @@ function loadAll() {
     sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
     sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
     sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false })
+    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false }),
+    sb.from('service_accounts').select('*').eq('user_id', userId).order('created_at')
   ]).then(function(res) {
     res.forEach(function(r, i) {
       if (r && r.error) console.warn('Table load error [' + i + ']:', r.error.message);
@@ -155,6 +157,7 @@ function loadAll() {
     customers = res[2].data || [];
     orders = res[3].data || [];
     ads = res[4].data || [];
+    serviceAccounts = (res[5] && res[5].data) || [];
     renderAll();
     // ad_configs loaded separately — re-render ads tab when ready
     sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
@@ -1096,6 +1099,9 @@ function openOrderModal(item) {
   $('om_accountInfo').value = item ? (item.account_info || '') : '';
   $('om_notes').value = item ? (item.notes || '') : '';
   $('om_manualName').value = item ? (item.platform || '') : '';
+  $('om_svcAcct').value = item ? (item.service_account_id || '') : '';
+  $('om_seat').value = item ? (item.seat_number || '') : '';
+  $('om_seatGroup').style.display = 'none';
 
   // Set personal select when editing a personal-channel order
   if (item && (item.channel || '8591') === '個人' && !item.product_id) {
@@ -1103,6 +1109,17 @@ function openOrderModal(item) {
   }
 
   onChannelChange();
+  // Show seat selection if editing order with service account, or product has accounts
+  if (item && item.product_id) {
+    var ep = products.filter(function(x) { return String(x.id) === String(item.product_id) })[0];
+    if (ep) {
+      var eAccts = serviceAccounts.filter(function(a) { return a.platform === ep.platform && a.status === '啟用' });
+      if (eAccts.length > 0) {
+        $('om_seatGroup').style.display = '';
+        initSvcAcctDrop(eAccts);
+      }
+    }
+  }
   if (item) calcOrderPreview();
   else $('orderPreview').innerHTML = '';
 
@@ -1124,7 +1141,59 @@ function onProductSelect() {
       dpSetVal('om_expiry', d.toISOString().slice(0, 10));
     }
     calcOrderPreview();
+    // Seat management: show account/seat if platform has service accounts
+    var accts = serviceAccounts.filter(function(a) { return a.platform === p.platform && a.status === '啟用' });
+    if (accts.length > 0) {
+      $('om_seatGroup').style.display = '';
+      initSvcAcctDrop(accts);
+    } else {
+      $('om_seatGroup').style.display = 'none';
+      $('om_svcAcct').value = '';
+      $('om_seat').value = '';
+    }
   }
+}
+
+function initSvcAcctDrop(accts) {
+  var items = accts.map(function(a) {
+    var seats = getSeatStatus(a.id);
+    var empty = seats.filter(function(s) { return s.status === 'empty' || s.status === 'expired' }).length;
+    return { value: String(a.id), label: a.email, icon: '📧', sub: empty + '/' + a.max_seats + ' 可用', tag: '', tagCls: empty > 0 ? 'green' : 'red' };
+  });
+  cdropInit('om_svcAcctDrop', {
+    items: items, placeholder: '選擇帳號', value: $('om_svcAcct').value || '',
+    onSelect: function(v) { $('om_svcAcct').value = v; initSeatDrop(v); }
+  });
+  // Auto-select if only one account
+  if (items.length === 1 && !$('om_svcAcct').value) {
+    $('om_svcAcct').value = items[0].value;
+    cdropInstances['om_svcAcctDrop'].state.value = items[0].value;
+    cdropRenderPanel('om_svcAcctDrop');
+    initSeatDrop(items[0].value);
+  } else if ($('om_svcAcct').value) {
+    initSeatDrop($('om_svcAcct').value);
+  }
+}
+
+function initSeatDrop(accountId) {
+  var seats = getSeatStatus(accountId);
+  var editingId = $('om_id').value;
+  var items = seats.map(function(s) {
+    var lbl = '使用者' + s.seat;
+    if (s.status === 'occupied') {
+      // Allow selecting if editing the same order
+      var isCurrentOrder = editingId && s.order && String(s.order.id) === String(editingId);
+      return { value: String(s.seat), label: lbl, sub: s.customer + '（' + s.expiry + '）', tag: '已佔用', tagCls: 'green', disabled: !isCurrentOrder };
+    } else if (s.status === 'expired') {
+      return { value: String(s.seat), label: lbl, sub: s.customer + '（已過期）', tag: '待處理', tagCls: 'yellow' };
+    }
+    return { value: String(s.seat), label: lbl, sub: '', tag: '空位', tagCls: '' };
+  });
+  cdropInit('om_seatDrop', {
+    items: items.filter(function(it) { return !it.disabled }),
+    placeholder: '選擇座位', value: $('om_seat').value || '',
+    onSelect: function(v) { $('om_seat').value = v; }
+  });
 }
 function calcOrderPreview() {
   var qty = Number($('om_qty').value) || 1;
@@ -1223,7 +1292,9 @@ function saveOrder() {
     commission_value: ag ? ag.commission_value : 0,
     expiry_date: dpGetVal('om_expiry') || null,
     account_info: $('om_accountInfo').value.trim(),
-    notes: $('om_notes').value.trim()
+    notes: $('om_notes').value.trim(),
+    service_account_id: $('om_svcAcct').value || null,
+    seat_number: $('om_seat').value ? Number($('om_seat').value) : null
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
 
@@ -1768,6 +1839,149 @@ document.addEventListener('click', function(e) {
   }
 });
 
+/* ──── Service Accounts (Seat Management) ──── */
+function getSeatStatus(accountId) {
+  var acct = serviceAccounts.filter(function(a) { return String(a.id) === String(accountId) })[0];
+  if (!acct) return [];
+  var td = today();
+  var seats = [];
+  for (var i = 1; i <= acct.max_seats; i++) {
+    var seatOrders = orders.filter(function(o) {
+      return String(o.service_account_id) === String(accountId) && o.seat_number === i && o.status === '已完成' && o.expiry_date;
+    }).sort(function(a, b) { return (b.expiry_date || '').localeCompare(a.expiry_date || '') });
+    var latest = seatOrders[0];
+    if (latest && latest.expiry_date >= td) {
+      seats.push({ seat: i, status: 'occupied', order: latest, customer: getCustomerName(latest.customer_id), expiry: latest.expiry_date, days_left: Math.ceil((new Date(latest.expiry_date) - new Date(td)) / 86400000) });
+    } else if (latest && latest.expiry_date < td) {
+      seats.push({ seat: i, status: 'expired', order: latest, customer: getCustomerName(latest.customer_id), expiry: latest.expiry_date, days_left: Math.ceil((new Date(latest.expiry_date) - new Date(td)) / 86400000) });
+    } else {
+      seats.push({ seat: i, status: 'empty', order: null, customer: '', expiry: '', days_left: 0 });
+    }
+  }
+  return seats;
+}
+
+function renderAccountManager() {
+  var el = $('svcAccountList');
+  if (!el) return;
+  if (serviceAccounts.length === 0) {
+    el.innerHTML = '<div class="empty" style="padding:16px"><p>尚未新增帳號</p></div>';
+    return;
+  }
+  var h = '<table class="acct-table"><tr><th>平台</th><th>Email</th><th>座位</th><th>狀態</th><th>操作</th></tr>';
+  serviceAccounts.forEach(function(a) {
+    var seats = getSeatStatus(a.id);
+    var empty = seats.filter(function(s) { return s.status === 'empty' }).length;
+    var expired = seats.filter(function(s) { return s.status === 'expired' }).length;
+    h += '<tr><td>' + esc(a.platform) + '</td><td>' + esc(a.email) + '</td>' +
+      '<td>' + empty + '/' + a.max_seats + ' 空位' + (expired > 0 ? ' <span class="text-yellow">' + expired + ' 待處理</span>' : '') + '</td>' +
+      '<td>' + (a.status === '啟用' ? '<span class="text-green">啟用</span>' : '<span class="text-grey">停用</span>') + '</td>' +
+      '<td><button class="btn sm ghost" onclick="openSvcAccountModal(getSvcAccount(\'' + a.id + '\'))">編輯</button>' +
+      '<button class="btn sm ghost text-red" onclick="deleteSvcAccount(\'' + a.id + '\')">刪除</button></td></tr>';
+  });
+  h += '</table>';
+  el.innerHTML = h;
+}
+
+function getSvcAccount(id) {
+  return serviceAccounts.filter(function(a) { return String(a.id) === String(id) })[0] || null;
+}
+
+function openSvcAccountModal(item) {
+  $('svcAcctModalTitle').textContent = item ? '編輯帳號' : '新增帳號';
+  $('sa_id').value = item ? item.id : '';
+  // Platform dropdown from existing product platforms
+  var plats = [];
+  products.forEach(function(p) {
+    if (p.platform && plats.indexOf(p.platform) < 0) plats.push(p.platform);
+  });
+  var platOpts = '<option value="">選擇平台</option>';
+  plats.sort().forEach(function(p) { platOpts += '<option value="' + esc(p) + '"' + (item && item.platform === p ? ' selected' : '') + '>' + esc(p) + '</option>' });
+  $('sa_platform').innerHTML = platOpts;
+  $('sa_email').value = item ? item.email : '';
+  $('sa_maxSeats').value = item ? item.max_seats : 5;
+  $('sa_notes').value = item ? (item.notes || '') : '';
+  $('sa_status').value = item ? item.status : '啟用';
+  openModal('svcAccountModal');
+}
+
+function saveSvcAccount() {
+  var plat = $('sa_platform').value;
+  var email = $('sa_email').value.trim();
+  if (!plat) return toast('請選擇平台', 'err');
+  if (!email) return toast('請輸入 Email', 'err');
+  var obj = {
+    platform: plat,
+    email: email,
+    max_seats: Number($('sa_maxSeats').value) || 5,
+    notes: $('sa_notes').value.trim(),
+    status: $('sa_status').value
+  };
+  var id = $('sa_id').value;
+  if (isDemo) {
+    if (id) {
+      var idx = serviceAccounts.findIndex(function(a) { return String(a.id) === String(id) });
+      if (idx >= 0) Object.assign(serviceAccounts[idx], obj);
+    } else {
+      obj.id = 'd' + Date.now();
+      serviceAccounts.push(obj);
+    }
+    demoSave(); closeModal(); renderAccountManager(); toast('帳號已儲存', 'ok');
+  } else {
+    obj.user_id = userId;
+    var req = id
+      ? sb.from('service_accounts').update(obj).eq('id', id)
+      : sb.from('service_accounts').insert(obj);
+    req.then(function(res) {
+      if (res.error) return toast(res.error.message, 'err');
+      closeModal(); loadAll(); toast('帳號已儲存', 'ok');
+    });
+  }
+}
+
+function renewSeat(accountId, seatNum, oldOrderId) {
+  var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
+  // Open new order modal pre-filled with same product + customer + account + seat
+  openOrderModal(null);
+  if (oldOrder) {
+    if (oldOrder.product_id) {
+      $('om_product').value = oldOrder.product_id;
+      cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
+      cdropRenderPanel('om_productDrop');
+      onProductSelect();
+    }
+    if (oldOrder.customer_id) {
+      $('om_customer').value = oldOrder.customer_id;
+      cdropInstances['om_customerDrop'].state.value = String(oldOrder.customer_id);
+      cdropRenderPanel('om_customerDrop');
+    }
+    $('om_svcAcct').value = accountId;
+    $('om_seat').value = seatNum;
+    // Re-init seat drops with pre-selected values
+    var accts = serviceAccounts.filter(function(a) { return String(a.id) === String(accountId) });
+    if (accts.length > 0) {
+      $('om_seatGroup').style.display = '';
+      initSvcAcctDrop(accts);
+    }
+  }
+}
+
+function deleteSvcAccount(id) {
+  var hasOrders = orders.some(function(o) { return String(o.service_account_id) === String(id) });
+  if (hasOrders) return toast('此帳號已有關聯訂單，無法刪除', 'err');
+  confirmAction('確定要刪除此帳號？', function() {
+    if (isDemo) {
+      serviceAccounts = serviceAccounts.filter(function(a) { return String(a.id) !== String(id) });
+      demoSave(); renderAccountManager(); toast('已刪除', 'ok');
+    } else {
+      sb.from('service_accounts').delete().eq('id', id).then(function(res) {
+        if (res.error) return toast(res.error.message, 'err');
+        loadAll(); toast('已刪除', 'ok');
+      });
+    }
+  });
+}
+
 /* ──── Settings ──── */
 function openSettings() {
   var mode = localStorage.getItem('proxy-ocr-mode') || 'free';
@@ -1777,6 +1991,7 @@ function openSettings() {
   $('set_ocrMode').onchange = function() {
     $('apiKeyGroup').style.display = this.value === 'ai' ? '' : 'none';
   };
+  renderAccountManager();
   openModal('settingsModal');
 }
 function saveSettings() {
@@ -1811,7 +2026,9 @@ function getSubscriptions() {
       unit_price: o.unit_price || 0,
       qty: o.qty || 1,
       account_info: o.account_info || '',
-      notes: o.notes || ''
+      notes: o.notes || '',
+      service_account_id: o.service_account_id || null,
+      seat_number: o.seat_number || null
     };
   }).sort(function(a, b) { return a.days_left - b.days_left; });
 }
@@ -1869,8 +2086,67 @@ function renderSubscriptions() {
     return minA - minB;
   });
 
+  // Platforms that have service accounts — render as seat grid
+  var seatPlatforms = {};
+  serviceAccounts.forEach(function(a) { if (a.status === '啟用') seatPlatforms[a.platform] = true; });
+
   groupKeys.forEach(function(plat) {
     var items = groups[plat];
+
+    // If this platform has service accounts, render seat grid
+    if (seatPlatforms[plat]) {
+      var platAccts = serviceAccounts.filter(function(a) { return a.platform === plat && a.status === '啟用' });
+      platAccts.forEach(function(acct) {
+        var seats = getSeatStatus(acct.id);
+        var emptyCount = seats.filter(function(s) { return s.status === 'empty' }).length;
+        var expiredCount = seats.filter(function(s) { return s.status === 'expired' }).length;
+        var occupiedCount = seats.filter(function(s) { return s.status === 'occupied' }).length;
+        html += '<div class="acct-card">' +
+          '<div class="acct-card-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
+            '<div><div class="acct-card-title">' + esc(acct.email) + '</div>' +
+            '<div class="acct-card-sub">' + esc(plat) + ' · ' + occupiedCount + '/' + acct.max_seats + ' 使用中' +
+            (expiredCount > 0 ? ' · <span class="text-yellow">' + expiredCount + ' 待處理</span>' : '') +
+            (emptyCount > 0 ? ' · <span class="text-green">' + emptyCount + ' 空位</span>' : '') +
+            '</div></div>' +
+            '<span class="subs-group-arrow">▼</span>' +
+          '</div>' +
+          '<div class="acct-card-body"><div class="seat-grid">';
+        seats.forEach(function(s) {
+          var cls = s.status;
+          html += '<div class="seat-row ' + cls + '">' +
+            '<div class="seat-num">使用者' + s.seat + '</div>' +
+            '<div class="seat-info">';
+          if (s.status === 'occupied') {
+            html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
+              '<div class="seat-expiry">' + s.expiry + ' · <span class="' + (s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green') + '">' + s.days_left + ' 天後到期</span></div>';
+          } else if (s.status === 'expired') {
+            html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
+              '<div class="seat-expiry"><span class="text-red">' + Math.abs(s.days_left) + ' 天前到期</span></div>';
+          } else {
+            html += '<div class="seat-customer" style="color:var(--fg3)">空位</div>';
+          }
+          html += '</div><div class="seat-actions">';
+          if (s.status === 'occupied') {
+            html += '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.order.id + '">編輯</button>';
+          } else if (s.status === 'expired') {
+            html += '<button class="btn sm primary" onclick="renewSeat(\'' + acct.id + '\',' + s.seat + ',\'' + (s.order ? s.order.id : '') + '\')">續約</button>';
+          }
+          html += '</div></div>';
+        });
+        html += '</div></div></div>';
+      });
+      // Also render non-account subscriptions for this platform (legacy orders without service_account_id)
+      var legacyItems = items.filter(function(s) { return !s.service_account_id; });
+      if (legacyItems.length > 0) {
+        renderSubGroup(legacyItems, plat + '（未綁定帳號）');
+      }
+      return;
+    }
+
+    renderSubGroup(items, plat);
+  });
+
+  function renderSubGroup(items, plat) {
     var urgentCount = items.filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
     var activeCount = items.filter(function(s) { return s.days_left >= 0; }).length;
     var headerCls = urgentCount > 0 ? 'text-red' : '';
@@ -1907,7 +2183,7 @@ function renderSubscriptions() {
     });
 
     html += '</div></div>';
-  });
+  }
 
   $('subsList').innerHTML = html;
 }
