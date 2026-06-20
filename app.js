@@ -2274,8 +2274,8 @@ function renderSubscriptions() {
     var merged = {};
     var soloItems = [];
     items.forEach(function(s) {
-      var key = (s.customer_id || '') + '||' + (s.product_id || '');
-      if (s.customer_id && s.product_id) {
+      var key = (s.customer_id || '') + '||' + (s.platform || '') + '||' + (s.version || '');
+      if (s.customer_id) {
         if (!merged[key]) merged[key] = [];
         merged[key].push(s);
       } else {
