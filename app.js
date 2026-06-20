@@ -1993,6 +1993,41 @@ function renewSeat(accountId, seatNum, oldOrderId) {
   }
 }
 
+function renewOrder(oldOrderId) {
+  var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
+  if (!oldOrder) return;
+  openOrderModal(null);
+  var startDate = oldOrder.expiry_date || today();
+  dpSetVal('om_date', startDate);
+  if (oldOrder.channel) $('om_channel').value = oldOrder.channel;
+  onChannelChange();
+  if (oldOrder.product_id) {
+    $('om_product').value = oldOrder.product_id;
+    cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
+    cdropRenderPanel('om_productDrop');
+    var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
+    if (prod) {
+      var ch = $('om_channel').value;
+      var usePrice = (ch === '蝦皮' && prod.shopee_price) ? prod.shopee_price : prod.price;
+      $('om_unitPrice').value = usePrice;
+      $('om_unitCost').value = prod.cost;
+      var months = parseInt(prod.duration) || 0;
+      if (months > 0) {
+        var d = new Date(startDate);
+        d.setMonth(d.getMonth() + months);
+        dpSetVal('om_expiry', d.toISOString().slice(0, 10));
+      }
+    }
+  }
+  if (oldOrder.customer_id) {
+    $('om_customer').value = oldOrder.customer_id;
+    cdropInstances['om_customerDrop'].state.value = String(oldOrder.customer_id);
+    cdropRenderPanel('om_customerDrop');
+  }
+  if (oldOrder.account_info) $('om_accountInfo').value = oldOrder.account_info;
+  calcOrderPreview();
+}
+
 function deleteSvcAccount(id) {
   var hasOrders = orders.some(function(o) { return String(o.service_account_id) === String(id) });
   if (hasOrders) return toast('此帳號已有關聯訂單，無法刪除', 'err');
@@ -2211,6 +2246,7 @@ function renderSubscriptions() {
         '</div>' +
         '<div class="sub-actions">' +
           '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
+          '<button class="btn sm primary" onclick="renewOrder(\'' + s.id + '\')">續約</button>' +
         '</div>' +
       '</div>';
     });
