@@ -5,6 +5,7 @@ var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.10; // 蝦皮預設 10%
 var sb = null, userId = null, isDemo = false;
 var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [], serviceAccounts = [];
+var renewExpiryBase = '';
 
 /* 個人管道預設商品 */
 var PERSONAL_PRESETS_DEFAULT = ['原神','崩鐵','鳴潮','絕區零','傳說','抖音','代付'];
@@ -1019,6 +1020,7 @@ function onPersonalSelect() {
   calcOrderPreview();
 }
 function openOrderModal(item) {
+  renewExpiryBase = '';
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
   $('om_id').value = item ? item.id : '';
   dpInit('om_date', { value: item ? item.order_date : today() });
@@ -1136,7 +1138,8 @@ function onProductSelect() {
     var dur = p.duration || '';
     var months = parseInt(dur) || 0;
     if (months > 0) {
-      var d = new Date(dpGetVal('om_date') || today());
+      var base = renewExpiryBase || dpGetVal('om_date') || today();
+      var d = new Date(base);
       d.setMonth(d.getMonth() + months);
       dpSetVal('om_expiry', d.toISOString().slice(0, 10));
     }
@@ -1957,6 +1960,7 @@ function renewSeat(accountId, seatNum, oldOrderId) {
   openOrderModal(null);
   if (oldOrder) {
     var expiryBase = oldOrder.expiry_date || today();
+    renewExpiryBase = expiryBase;
     dpSetVal('om_date', today());
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
@@ -2010,10 +2014,10 @@ function renewOrder(oldOrderId) {
   var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
   if (!oldOrder) return;
   var expiryBase = oldOrder.expiry_date || today();
-  // Pre-set customer/channel before openOrderModal so cdrop inits with correct value
   var presetCustId = oldOrder.customer_id || '';
   var presetChannel = oldOrder.channel || '8591';
   openOrderModal(null);
+  renewExpiryBase = expiryBase;
   // Order date = today (payment day), expiry = from previous expiry date
   dpSetVal('om_date', today());
   $('om_channel').value = presetChannel;
