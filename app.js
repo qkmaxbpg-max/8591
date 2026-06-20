@@ -2114,17 +2114,26 @@ function getSubscriptions() {
     var now = new Date(); now.setHours(0,0,0,0);
     var exp = new Date(o.expiry_date); exp.setHours(0,0,0,0);
     var diff = Math.ceil((exp - now) / 86400000);
+    var dur = o.duration || '';
+    var durMonths = parseInt(dur) || 0;
+    var startDate = o.order_date || '';
+    if (durMonths > 0 && o.expiry_date) {
+      var sd = new Date(o.expiry_date);
+      sd.setMonth(sd.getMonth() - durMonths);
+      startDate = sd.toISOString().slice(0, 10);
+    }
     return {
       id: o.id,
       platform: o.platform || '',
       version: o.version || '',
-      duration: o.duration || '',
+      duration: dur,
       buyer: o.notes ? (o.notes.match(/買家(No\.\d+)/)||[])[1] || '' : '',
       customer: getCustomerName(o.customer_id),
       customer_id: o.customer_id || '',
       product_id: o.product_id || '',
       channel: o.channel || '8591',
       order_date: o.order_date || '',
+      start_date: startDate,
       expiry_date: o.expiry_date,
       days_left: diff,
       unit_price: o.unit_price || 0,
@@ -2267,7 +2276,7 @@ function renderSubscriptions() {
         '<div class="sub-product">' + esc(s.version || s.platform) + (s.duration ? ' <span style="color:var(--fg2);font-weight:400">(' + esc(s.duration) + ')</span>' : '') + '</div>' +
         (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
         (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
-        '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + '</div>' +
+        '<div class="sub-dates">📅 ' + s.start_date + ' → ' + s.expiry_date + '</div>' +
         (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
       '</div>' +
       '<div class="sub-actions">' +
@@ -2327,7 +2336,7 @@ function renderSubscriptions() {
         var sCls = s.days_left < 0 ? 'past' : i === 0 ? 'current' : 'future';
         html += '<div class="sub-tl-item ' + sCls + '">' +
           '<span class="sub-tl-dot"></span>' +
-          '<span class="sub-tl-range">' + s.order_date + ' → ' + s.expiry_date + '</span>' +
+          '<span class="sub-tl-range">' + s.start_date + ' → ' + s.expiry_date + '</span>' +
           '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '" style="padding:2px 6px;font-size:12px">編輯</button>' +
         '</div>';
       });
