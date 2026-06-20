@@ -1181,9 +1181,9 @@ function initSeatDrop(accountId) {
   var items = seats.map(function(s) {
     var lbl = '使用者' + s.seat;
     if (s.status === 'occupied') {
-      // Allow selecting if editing the same order
       var isCurrentOrder = editingId && s.order && String(s.order.id) === String(editingId);
-      return { value: String(s.seat), label: lbl, sub: s.customer + '（' + s.expiry + '）', tag: '已佔用', tagCls: 'green', disabled: !isCurrentOrder };
+      var canRenew = !s.renewal && !isCurrentOrder;
+      return { value: String(s.seat), label: lbl, sub: s.customer + '（到期 ' + s.expiry + '）', tag: canRenew ? '可續約' : s.renewal ? '已排續約' : '已佔用', tagCls: 'green', disabled: !isCurrentOrder && !canRenew };
     } else if (s.status === 'expired') {
       return { value: String(s.seat), label: lbl, sub: s.customer + '（已過期）', tag: '待處理', tagCls: 'yellow' };
     }
@@ -1848,14 +1848,26 @@ function getSeatStatus(accountId) {
   for (var i = 1; i <= acct.max_seats; i++) {
     var seatOrders = orders.filter(function(o) {
       return String(o.service_account_id) === String(accountId) && o.seat_number === i && o.status === '已完成' && o.expiry_date;
-    }).sort(function(a, b) { return (b.expiry_date || '').localeCompare(a.expiry_date || '') });
-    var latest = seatOrders[0];
-    if (latest && latest.expiry_date >= td) {
-      seats.push({ seat: i, status: 'occupied', order: latest, customer: getCustomerName(latest.customer_id), expiry: latest.expiry_date, days_left: Math.ceil((new Date(latest.expiry_date) - new Date(td)) / 86400000) });
-    } else if (latest && latest.expiry_date < td) {
-      seats.push({ seat: i, status: 'expired', order: latest, customer: getCustomerName(latest.customer_id), expiry: latest.expiry_date, days_left: Math.ceil((new Date(latest.expiry_date) - new Date(td)) / 86400000) });
+    }).sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || '') });
+    // Find current active order (order_date <= today AND expiry >= today)
+    var current = null, renewal = null;
+    seatOrders.forEach(function(o) {
+      if (o.order_date <= td && o.expiry_date >= td) current = o;
+      if (o.order_date > td) renewal = o;
+    });
+    // Fallback: if no current, find the most recently expired
+    var lastExpired = null;
+    if (!current) {
+      var expired = seatOrders.filter(function(o) { return o.expiry_date < td });
+      if (expired.length) lastExpired = expired[expired.length - 1];
+    }
+    var ref = current || lastExpired;
+    if (current) {
+      seats.push({ seat: i, status: 'occupied', order: current, customer: getCustomerName(current.customer_id), expiry: current.expiry_date, days_left: Math.ceil((new Date(current.expiry_date) - new Date(td)) / 86400000), renewal: renewal });
+    } else if (lastExpired) {
+      seats.push({ seat: i, status: renewal ? 'occupied' : 'expired', order: lastExpired, customer: getCustomerName(lastExpired.customer_id), expiry: lastExpired.expiry_date, days_left: Math.ceil((new Date(lastExpired.expiry_date) - new Date(td)) / 86400000), renewal: renewal });
     } else {
-      seats.push({ seat: i, status: 'empty', order: null, customer: '', expiry: '', days_left: 0 });
+      seats.push({ seat: i, status: 'empty', order: null, customer: '', expiry: '', days_left: 0, renewal: null });
     }
   }
   return seats;
@@ -1941,14 +1953,30 @@ function saveSvcAccount() {
 
 function renewSeat(accountId, seatNum, oldOrderId) {
   var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
-  // Open new order modal pre-filled with same product + customer + account + seat
   openOrderModal(null);
   if (oldOrder) {
+    // Set order date = old order's expiry (seamless continuation)
+    var startDate = oldOrder.expiry_date || today();
+    dpSetVal('om_date', startDate);
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
       cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
       cdropRenderPanel('om_productDrop');
-      onProductSelect();
+      // Calculate new expiry from the start date
+      var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
+      if (prod) {
+        var ch = $('om_channel').value;
+        var usePrice = (ch === '蝦皮' && prod.shopee_price) ? prod.shopee_price : prod.price;
+        $('om_unitPrice').value = usePrice;
+        $('om_unitCost').value = prod.cost;
+        var months = parseInt(prod.duration) || 0;
+        if (months > 0) {
+          var d = new Date(startDate);
+          d.setMonth(d.getMonth() + months);
+          dpSetVal('om_expiry', d.toISOString().slice(0, 10));
+        }
+        calcOrderPreview();
+      }
     }
     if (oldOrder.customer_id) {
       $('om_customer').value = oldOrder.customer_id;
@@ -1957,7 +1985,6 @@ function renewSeat(accountId, seatNum, oldOrderId) {
     }
     $('om_svcAcct').value = accountId;
     $('om_seat').value = seatNum;
-    // Re-init seat drops with pre-selected values
     var accts = serviceAccounts.filter(function(a) { return String(a.id) === String(accountId) });
     if (accts.length > 0) {
       $('om_seatGroup').style.display = '';
@@ -2119,6 +2146,9 @@ function renderSubscriptions() {
           if (s.status === 'occupied') {
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry">' + s.expiry + ' · <span class="' + (s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green') + '">' + s.days_left + ' 天後到期</span></div>';
+            if (s.renewal) {
+              html += '<div class="seat-expiry" style="margin-top:2px"><span class="seat-badge green">已排續約</span> ' + s.renewal.order_date + ' → ' + s.renewal.expiry_date + '</div>';
+            }
           } else if (s.status === 'expired') {
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry"><span class="text-red">' + Math.abs(s.days_left) + ' 天前到期</span></div>';
@@ -2128,6 +2158,9 @@ function renderSubscriptions() {
           html += '</div><div class="seat-actions">';
           if (s.status === 'occupied') {
             html += '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.order.id + '">編輯</button>';
+            if (!s.renewal) {
+              html += '<button class="btn sm primary" onclick="renewSeat(\'' + acct.id + '\',' + s.seat + ',\'' + s.order.id + '\')">續約</button>';
+            }
           } else if (s.status === 'expired') {
             html += '<button class="btn sm primary" onclick="renewSeat(\'' + acct.id + '\',' + s.seat + ',\'' + (s.order ? s.order.id : '') + '\')">續約</button>';
           }
