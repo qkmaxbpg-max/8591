@@ -1982,7 +1982,11 @@ function renewSeat(accountId, seatNum, oldOrderId) {
       if (cdropInstances['om_customerDrop']) {
         cdropInstances['om_customerDrop'].state.value = String(presetCustId);
         var ci = cdropInstances['om_customerDrop'].state.items.filter(function(it) { return String(it.value) === String(presetCustId) })[0];
-        if (ci) cdropInstances['om_customerDrop'].state.text = ci.label;
+        if (ci) {
+          cdropInstances['om_customerDrop'].state.text = ci.label;
+          var inp = document.querySelector('[data-cdrop-input="om_customerDrop"]');
+          if (inp) inp.value = ci.label;
+        }
         cdropRenderPanel('om_customerDrop');
       }
     }
@@ -2031,7 +2035,11 @@ function renewOrder(oldOrderId) {
     if (cdropInstances['om_customerDrop']) {
       cdropInstances['om_customerDrop'].state.value = String(presetCustId);
       var ci = cdropInstances['om_customerDrop'].state.items.filter(function(it) { return String(it.value) === String(presetCustId) })[0];
-      if (ci) cdropInstances['om_customerDrop'].state.text = ci.label;
+      if (ci) {
+        cdropInstances['om_customerDrop'].state.text = ci.label;
+        var inp = document.querySelector('[data-cdrop-input="om_customerDrop"]');
+        if (inp) inp.value = ci.label;
+      }
       cdropRenderPanel('om_customerDrop');
     }
   }
