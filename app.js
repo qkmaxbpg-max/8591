@@ -2180,6 +2180,7 @@ function renderSubscriptions() {
 
   if (filtered.length === 0) {
     $('subsList').innerHTML = '<div class="empty"><div class="icon">📅</div><p>沒有符合條件的訂閱</p></div>';
+    if ($('subsNav')) $('subsNav').innerHTML = '';
     return;
   }
 
@@ -2191,7 +2192,6 @@ function renderSubscriptions() {
     groups[key].push(s);
   });
 
-  var html = '';
   // Sort groups: platforms with most urgent items first
   var groupKeys = Object.keys(groups).sort(function(a, b) {
     var minA = groups[a].reduce(function(m, s) { return Math.min(m, s.days_left); }, 9999);
@@ -2199,12 +2199,29 @@ function renderSubscriptions() {
     return minA - minB;
   });
 
+  // Platform quick nav
+  if ($('subsNav')) {
+    var navHtml = '';
+    groupKeys.forEach(function(plat) {
+      var cnt = groups[plat].length;
+      var urgCnt = groups[plat].filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
+      var cls = urgCnt > 0 ? ' urgent' : '';
+      navHtml += '<button class="subs-nav-chip' + cls + '" onclick="document.getElementById(\'subsGrp_' + encodeURIComponent(plat) + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' +
+        esc(plat) + ' <span class="subs-nav-cnt">' + cnt + '</span>' +
+        '</button>';
+    });
+    $('subsNav').innerHTML = navHtml;
+  }
+
+  var html = '';
+
   // Platforms that have service accounts — render as seat grid
   var seatPlatforms = {};
   serviceAccounts.forEach(function(a) { if (a.status === '啟用') seatPlatforms[a.platform] = true; });
 
   groupKeys.forEach(function(plat) {
     var items = groups[plat];
+    var grpId = 'subsGrp_' + encodeURIComponent(plat);
 
     // If this platform has service accounts, render seat grid
     if (seatPlatforms[plat]) {
@@ -2214,7 +2231,8 @@ function renderSubscriptions() {
         var emptyCount = seats.filter(function(s) { return s.status === 'empty' }).length;
         var expiredCount = seats.filter(function(s) { return s.status === 'expired' }).length;
         var occupiedCount = seats.filter(function(s) { return s.status === 'occupied' }).length;
-        html += '<div class="acct-card">' +
+        var cardId = grpId; grpId = '';
+        html += '<div class="acct-card"' + (cardId ? ' id="' + cardId + '"' : '') + '>' +
           '<div class="acct-card-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
             '<div><div class="acct-card-title">' + esc(acct.email) + '</div>' +
             '<div class="acct-card-sub">' + esc(plat) + ' · ' + occupiedCount + '/' + acct.max_seats + ' 使用中' +
@@ -2262,7 +2280,7 @@ function renderSubscriptions() {
       return;
     }
 
-    renderSubGroup(items, plat);
+    renderSubGroup(items, plat, grpId);
   });
 
   function renderSubCard(s) {
@@ -2286,12 +2304,12 @@ function renderSubscriptions() {
     '</div>';
   }
 
-  function renderSubGroup(items, plat) {
+  function renderSubGroup(items, plat, grpId) {
     var urgentCount = items.filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
     var activeCount = items.filter(function(s) { return s.days_left >= 0; }).length;
     var headerCls = urgentCount > 0 ? 'text-red' : '';
 
-    html += '<div class="subs-group">' +
+    html += '<div class="subs-group"' + (grpId ? ' id="' + grpId + '"' : '') + '>' +
       '<div class="subs-group-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
         '<span class="subs-group-arrow">▼</span>' +
         '<span class="subs-group-name">' + esc(plat) + '</span>' +
