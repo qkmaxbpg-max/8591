@@ -410,6 +410,22 @@ tr:hover td{background:var(--bg2)}
 .acct-card.collapsed .acct-card-body{display:none}
 .acct-card.collapsed .subs-group-arrow{transform:rotate(-90deg)}
 .subs-group-body .sub-card{margin-bottom:6px}
+.sub-card.merged{align-items:flex-start}
+.sub-card.merged .sub-actions{align-self:flex-start;margin-top:2px}
+.sub-merge-badge{display:inline-block;background:var(--accent-dim);color:var(--accent);font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
+.sub-timeline{margin-top:6px;padding-left:2px}
+.sub-tl-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.78rem;color:var(--fg2);position:relative;padding-left:14px}
+.sub-tl-item::before{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;background:var(--bg4)}
+.sub-tl-item:first-child::before{top:50%}
+.sub-tl-item:last-child::before{bottom:50%}
+.sub-tl-item:only-child::before{display:none}
+.sub-tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;position:absolute;left:1px;z-index:1}
+.sub-tl-item.current .sub-tl-dot{background:var(--green)}
+.sub-tl-item.past .sub-tl-dot{background:var(--fg3)}
+.sub-tl-item.future .sub-tl-dot{background:var(--accent)}
+.sub-tl-item.current{color:var(--fg0);font-weight:500}
+.sub-tl-item.past{color:var(--fg3)}
+.sub-tl-item.future{color:var(--accent)}
 
 /* Dashboard expiry section */
 #dashExpiryCard .card-head{display:flex;justify-content:space-between;align-items:center}

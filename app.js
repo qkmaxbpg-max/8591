@@ -1953,16 +1953,15 @@ function saveSvcAccount() {
 
 function renewSeat(accountId, seatNum, oldOrderId) {
   var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
+  var presetCustId = oldOrder ? (oldOrder.customer_id || '') : '';
   openOrderModal(null);
   if (oldOrder) {
-    // Set order date = old order's expiry (seamless continuation)
-    var startDate = oldOrder.expiry_date || today();
-    dpSetVal('om_date', startDate);
+    var expiryBase = oldOrder.expiry_date || today();
+    dpSetVal('om_date', today());
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
       cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
       cdropRenderPanel('om_productDrop');
-      // Calculate new expiry from the start date
       var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
       if (prod) {
         var ch = $('om_channel').value;
@@ -1971,17 +1970,21 @@ function renewSeat(accountId, seatNum, oldOrderId) {
         $('om_unitCost').value = prod.cost;
         var months = parseInt(prod.duration) || 0;
         if (months > 0) {
-          var d = new Date(startDate);
+          var d = new Date(expiryBase);
           d.setMonth(d.getMonth() + months);
           dpSetVal('om_expiry', d.toISOString().slice(0, 10));
         }
         calcOrderPreview();
       }
     }
-    if (oldOrder.customer_id) {
-      $('om_customer').value = oldOrder.customer_id;
-      cdropInstances['om_customerDrop'].state.value = String(oldOrder.customer_id);
-      cdropRenderPanel('om_customerDrop');
+    if (presetCustId) {
+      $('om_customer').value = presetCustId;
+      if (cdropInstances['om_customerDrop']) {
+        cdropInstances['om_customerDrop'].state.value = String(presetCustId);
+        var ci = cdropInstances['om_customerDrop'].state.items.filter(function(it) { return String(it.value) === String(presetCustId) })[0];
+        if (ci) cdropInstances['om_customerDrop'].state.text = ci.label;
+        cdropRenderPanel('om_customerDrop');
+      }
     }
     $('om_svcAcct').value = accountId;
     $('om_seat').value = seatNum;
@@ -1996,10 +1999,14 @@ function renewSeat(accountId, seatNum, oldOrderId) {
 function renewOrder(oldOrderId) {
   var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
   if (!oldOrder) return;
+  var expiryBase = oldOrder.expiry_date || today();
+  // Pre-set customer/channel before openOrderModal so cdrop inits with correct value
+  var presetCustId = oldOrder.customer_id || '';
+  var presetChannel = oldOrder.channel || '8591';
   openOrderModal(null);
-  var startDate = oldOrder.expiry_date || today();
-  dpSetVal('om_date', startDate);
-  if (oldOrder.channel) $('om_channel').value = oldOrder.channel;
+  // Order date = today (payment day), expiry = from previous expiry date
+  dpSetVal('om_date', today());
+  $('om_channel').value = presetChannel;
   onChannelChange();
   if (oldOrder.product_id) {
     $('om_product').value = oldOrder.product_id;
@@ -2013,16 +2020,20 @@ function renewOrder(oldOrderId) {
       $('om_unitCost').value = prod.cost;
       var months = parseInt(prod.duration) || 0;
       if (months > 0) {
-        var d = new Date(startDate);
+        var d = new Date(expiryBase);
         d.setMonth(d.getMonth() + months);
         dpSetVal('om_expiry', d.toISOString().slice(0, 10));
       }
     }
   }
-  if (oldOrder.customer_id) {
-    $('om_customer').value = oldOrder.customer_id;
-    cdropInstances['om_customerDrop'].state.value = String(oldOrder.customer_id);
-    cdropRenderPanel('om_customerDrop');
+  if (presetCustId) {
+    $('om_customer').value = presetCustId;
+    if (cdropInstances['om_customerDrop']) {
+      cdropInstances['om_customerDrop'].state.value = String(presetCustId);
+      var ci = cdropInstances['om_customerDrop'].state.items.filter(function(it) { return String(it.value) === String(presetCustId) })[0];
+      if (ci) cdropInstances['om_customerDrop'].state.text = ci.label;
+      cdropRenderPanel('om_customerDrop');
+    }
   }
   if (oldOrder.account_info) $('om_accountInfo').value = oldOrder.account_info;
   calcOrderPreview();
@@ -2081,6 +2092,8 @@ function getSubscriptions() {
       duration: o.duration || '',
       buyer: o.notes ? (o.notes.match(/買家(No\.\d+)/)||[])[1] || '' : '',
       customer: getCustomerName(o.customer_id),
+      customer_id: o.customer_id || '',
+      product_id: o.product_id || '',
       channel: o.channel || '8591',
       order_date: o.order_date || '',
       expiry_date: o.expiry_date,
@@ -2214,6 +2227,27 @@ function renderSubscriptions() {
     renderSubGroup(items, plat);
   });
 
+  function renderSubCard(s) {
+    var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
+    var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
+    var who = s.customer || s.buyer || '';
+    return '<div class="sub-card ' + cls + '">' +
+      '<div class="sub-countdown"><div class="days ' + daysCls + '">' + (s.days_left < 0 ? Math.abs(s.days_left) : s.days_left) + '</div>' +
+      '<div class="days-label">' + (s.days_left < 0 ? '天前到期' : s.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
+      '<div class="sub-info">' +
+        '<div class="sub-product">' + esc(s.version || s.platform) + (s.duration ? ' <span style="color:var(--fg2);font-weight:400">(' + esc(s.duration) + ')</span>' : '') + '</div>' +
+        (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
+        (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
+        '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + '</div>' +
+        (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
+      '</div>' +
+      '<div class="sub-actions">' +
+        '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
+        '<button class="btn sm primary" onclick="renewOrder(\'' + s.id + '\')">續約</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderSubGroup(items, plat) {
     var urgentCount = items.filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; }).length;
     var activeCount = items.filter(function(s) { return s.days_left >= 0; }).length;
@@ -2229,27 +2263,54 @@ function renderSubscriptions() {
       '</div>' +
       '<div class="subs-group-body">';
 
+    var merged = {};
+    var soloItems = [];
     items.forEach(function(s) {
-      var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
-      var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
-      var who = s.customer || s.buyer || '';
+      var key = (s.customer_id || '') + '||' + (s.product_id || '');
+      if (s.customer_id && s.product_id) {
+        if (!merged[key]) merged[key] = [];
+        merged[key].push(s);
+      } else {
+        soloItems.push(s);
+      }
+    });
 
-      html += '<div class="sub-card ' + cls + '">' +
-        '<div class="sub-countdown"><div class="days ' + daysCls + '">' + (s.days_left < 0 ? Math.abs(s.days_left) : s.days_left) + '</div>' +
-        '<div class="days-label">' + (s.days_left < 0 ? '天前到期' : s.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
+    Object.keys(merged).forEach(function(key) {
+      var group = merged[key].sort(function(a, b) { return a.days_left - b.days_left; });
+      if (group.length === 1) {
+        soloItems.push(group[0]);
+        return;
+      }
+      var latest = group[0];
+      var who = latest.customer || latest.buyer || '';
+      var latestCls = latest.days_left < 0 ? 'expired' : latest.days_left <= 2 ? 'urgent' : latest.days_left <= 7 ? 'warning' : '';
+      var latestDaysCls = latest.days_left < 0 ? 'text-grey' : latest.days_left <= 2 ? 'text-red' : latest.days_left <= 7 ? 'text-yellow' : 'text-green';
+      html += '<div class="sub-card merged ' + latestCls + '">' +
+        '<div class="sub-countdown"><div class="days ' + latestDaysCls + '">' + (latest.days_left < 0 ? Math.abs(latest.days_left) : latest.days_left) + '</div>' +
+        '<div class="days-label">' + (latest.days_left < 0 ? '天前到期' : latest.days_left === 0 ? '今天到期' : '天後到期') + '</div></div>' +
         '<div class="sub-info">' +
-          '<div class="sub-product">' + esc(s.version || s.platform) + (s.duration ? ' <span style="color:var(--fg2);font-weight:400">(' + esc(s.duration) + ')</span>' : '') + '</div>' +
+          '<div class="sub-product">' + esc(latest.version || latest.platform) + (latest.duration ? ' <span style="color:var(--fg2);font-weight:400">(' + esc(latest.duration) + ')</span>' : '') +
+          ' <span class="sub-merge-badge">' + group.length + ' 筆訂單</span></div>' +
           (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
-          (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
-          '<div class="sub-dates">📅 ' + s.order_date + ' → ' + s.expiry_date + '</div>' +
-          (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
-        '</div>' +
+          (latest.account_info ? '<div class="sub-account">🔑 ' + esc(latest.account_info) + '</div>' : '') +
+          '<div class="sub-timeline">';
+      group.forEach(function(s, i) {
+        var sCls = s.days_left < 0 ? 'past' : i === 0 ? 'current' : 'future';
+        html += '<div class="sub-tl-item ' + sCls + '">' +
+          '<span class="sub-tl-dot"></span>' +
+          '<span class="sub-tl-range">' + s.order_date + ' → ' + s.expiry_date + '</span>' +
+          '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '" style="padding:2px 6px;font-size:12px">編輯</button>' +
+        '</div>';
+      });
+      html += '</div></div>' +
         '<div class="sub-actions">' +
-          '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '">編輯</button>' +
-          '<button class="btn sm primary" onclick="renewOrder(\'' + s.id + '\')">續約</button>' +
+          '<button class="btn sm primary" onclick="renewOrder(\'' + latest.id + '\')">續約</button>' +
         '</div>' +
       '</div>';
     });
+
+    soloItems.sort(function(a, b) { return a.days_left - b.days_left; });
+    soloItems.forEach(function(s) { html += renderSubCard(s); });
 
     html += '</div></div>';
   }
