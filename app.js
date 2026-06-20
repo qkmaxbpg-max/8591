@@ -923,7 +923,7 @@ function renderOrders() {
     }
     return true;
   });
-  list.sort(function(a, b) { return (parseInt(b.order_no) || 0) - (parseInt(a.order_no) || 0) });
+  list.sort(function(a, b) { return (b.order_no || '').localeCompare(a.order_no || '') });
   if (list.length === 0) {
     $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
     return;
