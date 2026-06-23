@@ -2249,14 +2249,18 @@ function renderSubscriptions() {
             '<div class="seat-num">使用者' + s.seat + '</div>' +
             '<div class="seat-info">';
           if (s.status === 'occupied') {
+            var oNotes = s.order ? (s.order.notes || '') : '';
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry">' + s.expiry + ' · <span class="' + (s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green') + '">' + s.days_left + ' 天後到期</span></div>';
+            if (oNotes) html += '<div class="seat-notes">📝 ' + esc(oNotes) + '</div>';
             if (s.renewal) {
               html += '<div class="seat-expiry" style="margin-top:2px"><span class="seat-badge green">已排續約</span> ' + s.renewal.order_date + ' → ' + s.renewal.expiry_date + '</div>';
             }
           } else if (s.status === 'expired') {
+            var eNotes = s.order ? (s.order.notes || '') : '';
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry"><span class="text-red">' + Math.abs(s.days_left) + ' 天前到期</span></div>';
+            if (eNotes) html += '<div class="seat-notes">📝 ' + esc(eNotes) + '</div>';
           } else {
             html += '<div class="seat-customer" style="color:var(--fg3)">空位</div>';
           }
