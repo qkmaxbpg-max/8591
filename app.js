@@ -972,18 +972,19 @@ function getCustomerName(id) {
   var c = customers.filter(function(x) { return String(x.id) === String(id) })[0];
   return c ? c.name : '';
 }
-function onChannelChange() {
+function onChannelChange(skipPrice) {
   var ch = $('om_channel').value;
   var isPersonal = ch === '個人';
   $('om_manualGroup').style.display = isPersonal ? '' : 'none';
   $('om_productGroup').style.display = '';
   if (isPersonal) renderPersonalSelect();
-  // Re-fill price based on channel
-  var pid = $('om_product').value;
-  var p = pid ? products.filter(function(x) { return String(x.id) === String(pid) })[0] : null;
-  if (p) {
-    var usePrice = (ch === '蝦皮' && p.shopee_price) ? p.shopee_price : p.price;
-    $('om_unitPrice').value = usePrice;
+  if (!skipPrice) {
+    var pid = $('om_product').value;
+    var p = pid ? products.filter(function(x) { return String(x.id) === String(pid) })[0] : null;
+    if (p) {
+      var usePrice = ((ch === '蝦皮' || ch === '個人') && p.shopee_price) ? p.shopee_price : p.price;
+      $('om_unitPrice').value = usePrice;
+    }
   }
   calcOrderPreview();
 }
@@ -1110,7 +1111,7 @@ function openOrderModal(item) {
     renderPersonalSelect(item.platform || '');
   }
 
-  onChannelChange();
+  onChannelChange(!!item);
   // Show seat selection if editing order with service account, or product has accounts
   if (item && item.product_id) {
     var ep = products.filter(function(x) { return String(x.id) === String(item.product_id) })[0];
@@ -1132,7 +1133,7 @@ function onProductSelect() {
   var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
   if (p) {
     var ch = $('om_channel').value;
-    var usePrice = (ch === '蝦皮' && p.shopee_price) ? p.shopee_price : p.price;
+    var usePrice = ((ch === '蝦皮' || ch === '個人') && p.shopee_price) ? p.shopee_price : p.price;
     $('om_unitPrice').value = usePrice;
     $('om_unitCost').value = p.cost;
     var dur = p.duration || '';
@@ -1975,7 +1976,7 @@ function renewSeat(accountId, seatNum, oldOrderId) {
       var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
       if (prod) {
         var ch = $('om_channel').value;
-        var usePrice = (ch === '蝦皮' && prod.shopee_price) ? prod.shopee_price : prod.price;
+        var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
         $('om_unitPrice').value = usePrice;
         $('om_unitCost').value = prod.cost;
         var months = parseInt(prod.duration) || 0;
@@ -2035,7 +2036,7 @@ function renewOrder(oldOrderId) {
     var prod = products.filter(function(x) { return String(x.id) === String(oldOrder.product_id) })[0];
     if (prod) {
       var ch = $('om_channel').value;
-      var usePrice = (ch === '蝦皮' && prod.shopee_price) ? prod.shopee_price : prod.price;
+      var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
       $('om_unitPrice').value = usePrice;
       $('om_unitCost').value = prod.cost;
       var months = parseInt(prod.duration) || 0;
