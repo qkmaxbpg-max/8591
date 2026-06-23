@@ -2148,9 +2148,24 @@ function renderSubscriptions() {
   var filter = $('subsFilter') ? $('subsFilter').value : 'active';
   var q = ($('subsSearch') ? $('subsSearch').value : '').toLowerCase();
 
+  var renewalSet = {};
+  subs.forEach(function(s) {
+    if (!s.customer_id) return;
+    var key = s.customer_id + '||' + s.platform + '||' + s.version;
+    if (!renewalSet[key]) renewalSet[key] = [];
+    renewalSet[key].push(s);
+  });
+  var hasRenewal = {};
+  Object.keys(renewalSet).forEach(function(key) {
+    if (renewalSet[key].length > 1) {
+      renewalSet[key].forEach(function(s) { hasRenewal[s.id] = true; });
+    }
+  });
+
   var filtered = subs.filter(function(s) {
     if (filter === 'active') return s.days_left >= 0;
     if (filter === 'expiring') return s.days_left >= 0 && s.days_left <= 7;
+    if (filter === 'renewal') return hasRenewal[s.id];
     if (filter === 'expired') return s.days_left < 0;
     return true;
   });
