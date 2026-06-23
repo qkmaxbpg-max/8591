@@ -1098,6 +1098,7 @@ function openOrderModal(item) {
   $('om_unitPrice').value = item ? item.unit_price : '';
   $('om_unitCost').value = item ? item.unit_cost : '';
   $('om_status').value = item ? item.status : '已完成';
+  dpInit('om_startDate', { value: item ? (item.start_date || item.order_date || '') : today(), allowEmpty: true });
   dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
   $('om_accountInfo').value = item ? (item.account_info || '') : '';
   $('om_notes').value = item ? (item.notes || '') : '';
@@ -1139,7 +1140,8 @@ function onProductSelect() {
     var dur = p.duration || '';
     var months = parseInt(dur) || 0;
     if (months > 0) {
-      var base = renewExpiryBase || dpGetVal('om_date') || today();
+      var base = dpGetVal('om_startDate') || dpGetVal('om_date') || today();
+      if (!dpGetVal('om_startDate')) dpSetVal('om_startDate', base);
       var d = new Date(base);
       d.setMonth(d.getMonth() + months);
       dpSetVal('om_expiry', d.toISOString().slice(0, 10));
@@ -1294,6 +1296,7 @@ function saveOrder() {
     fee_value: ch === '8591' ? PLATFORM_FEE : ch === '蝦皮' ? SHOPEE_FEE : 0,
     commission_type: ag ? ag.commission_type : '百分比',
     commission_value: ag ? ag.commission_value : 0,
+    start_date: dpGetVal('om_startDate') || null,
     expiry_date: dpGetVal('om_expiry') || null,
     account_info: $('om_accountInfo').value.trim(),
     notes: $('om_notes').value.trim(),
@@ -1961,8 +1964,8 @@ function renewSeat(accountId, seatNum, oldOrderId) {
   openOrderModal(null);
   if (oldOrder) {
     var expiryBase = oldOrder.expiry_date || today();
-    renewExpiryBase = expiryBase;
     dpSetVal('om_date', today());
+    dpSetVal('om_startDate', expiryBase);
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
       cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
@@ -2018,9 +2021,8 @@ function renewOrder(oldOrderId) {
   var presetCustId = oldOrder.customer_id || '';
   var presetChannel = oldOrder.channel || '8591';
   openOrderModal(null);
-  renewExpiryBase = expiryBase;
-  // Order date = today (payment day), expiry = from previous expiry date
   dpSetVal('om_date', today());
+  dpSetVal('om_startDate', expiryBase);
   $('om_channel').value = presetChannel;
   onChannelChange();
   if (oldOrder.product_id) {
@@ -2116,13 +2118,7 @@ function getSubscriptions() {
     var exp = new Date(o.expiry_date); exp.setHours(0,0,0,0);
     var diff = Math.ceil((exp - now) / 86400000);
     var dur = o.duration || '';
-    var durMonths = parseInt(dur) || 0;
-    var startDate = o.order_date || '';
-    if (durMonths > 0 && o.expiry_date) {
-      var sd = new Date(o.expiry_date);
-      sd.setMonth(sd.getMonth() - durMonths);
-      startDate = sd.toISOString().slice(0, 10);
-    }
+    var startDate = o.start_date || o.order_date || '';
     return {
       id: o.id,
       platform: o.platform || '',
