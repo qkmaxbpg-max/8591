@@ -2356,6 +2356,7 @@ function renderSubscriptions() {
         html += '<div class="sub-tl-item ' + sCls + '">' +
           '<span class="sub-tl-dot"></span>' +
           '<span class="sub-tl-range">' + s.start_date + ' → ' + s.expiry_date + '</span>' +
+          (s.account_info ? '<span class="sub-tl-acct">🔑 ' + esc(s.account_info) + '</span>' : '') +
           '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.id + '" style="padding:2px 6px;font-size:12px">編輯</button>' +
         '</div>';
       });

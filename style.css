@@ -435,6 +435,7 @@ th.sticky-col{background:var(--bg2)}
 .sub-tl-item.current{color:var(--fg0);font-weight:500}
 .sub-tl-item.past{color:var(--fg3)}
 .sub-tl-item.future{color:var(--accent)}
+.sub-tl-acct{font-size:.75rem;color:var(--accent);margin-left:4px;word-break:break-all}
 
 /* Dashboard expiry section */
 #dashExpiryCard .card-head{display:flex;justify-content:space-between;align-items:center}
