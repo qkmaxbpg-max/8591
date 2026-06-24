@@ -2299,6 +2299,22 @@ function renderSubscriptions() {
     renderSubGroup(items, plat, grpId);
   });
 
+  function cycleTag(s) {
+    if (s.platform !== 'YouTube Premium') return '';
+    var months = parseInt(s.duration) || 0;
+    if (months <= 1) return '';
+    if (s.days_left < 0) return '';
+    var start = new Date(s.start_date || s.order_date);
+    var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
+    var elapsed = Math.floor((now - start) / 86400000);
+    if (elapsed < 0) elapsed = 0;
+    var inCycle = elapsed % 30;
+    var daysLeft = 30 - inCycle;
+    if (daysLeft === 30) daysLeft = 0;
+    var cls = daysLeft <= 2 ? 'text-red' : daysLeft <= 5 ? 'text-yellow' : 'text-green';
+    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + daysLeft + ' 天</span></div>';
+  }
+
   function renderSubCard(s) {
     var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
     var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
@@ -2311,6 +2327,7 @@ function renderSubscriptions() {
         (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
         (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
         '<div class="sub-dates">📅 ' + s.start_date + ' → ' + s.expiry_date + '</div>' +
+        cycleTag(s) +
         (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
       '</div>' +
       '<div class="sub-actions">' +
@@ -2365,6 +2382,7 @@ function renderSubscriptions() {
           ' <span class="sub-merge-badge">' + group.length + ' 筆訂單</span></div>' +
           (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
           (latest.account_info ? '<div class="sub-account">🔑 ' + esc(latest.account_info) + '</div>' : '') +
+          cycleTag(latest) +
           '<div class="sub-timeline">';
       group.forEach(function(s, i) {
         var sCls = s.days_left < 0 ? 'past' : i === 0 ? 'current' : 'future';
