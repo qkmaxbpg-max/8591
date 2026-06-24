@@ -583,8 +583,9 @@ function _renderDashboard() {
     $('recentOrders').innerHTML = h + '</table>';
   }
 
-  // Dashboard expiry section
+  // Dashboard expiry & cycle sections
   renderDashboardExpiry();
+  renderDashboardCycle();
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
@@ -2162,10 +2163,18 @@ function renderSubscriptions() {
     }
   });
 
+  var cycleCount = subs.filter(function(s) { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3; }).length;
+  var badge = $('cycleBadge');
+  if (badge) {
+    if (cycleCount > 0) { badge.style.display = ''; badge.textContent = cycleCount; }
+    else { badge.style.display = 'none'; }
+  }
+
   var filtered = subs.filter(function(s) {
     if (filter === 'active') return s.days_left >= 0;
     if (filter === 'expiring') return s.days_left >= 0 && s.days_left <= 7;
     if (filter === 'renewal') return hasRenewal[s.id];
+    if (filter === 'cycle') { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3; }
     if (filter === 'expired') return s.days_left < 0;
     return true;
   });
@@ -2300,19 +2309,10 @@ function renderSubscriptions() {
   });
 
   function cycleTag(s) {
-    if (s.platform !== 'YouTube Premium') return '';
-    var months = parseInt(s.duration) || 0;
-    if (months <= 1) return '';
-    if (s.days_left < 0) return '';
-    var start = new Date(s.start_date || s.order_date);
-    var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
-    var elapsed = Math.floor((now - start) / 86400000);
-    if (elapsed < 0) elapsed = 0;
-    var inCycle = elapsed % 30;
-    var daysLeft = 30 - inCycle;
-    if (daysLeft === 30) daysLeft = 0;
-    var cls = daysLeft <= 2 ? 'text-red' : daysLeft <= 5 ? 'text-yellow' : 'text-green';
-    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + daysLeft + ' 天</span></div>';
+    var cl = getCycleDaysLeft(s);
+    if (cl < 0) return '';
+    var cls = cl <= 2 ? 'text-red' : cl <= 5 ? 'text-yellow' : 'text-green';
+    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + cl + ' 天</span></div>';
   }
 
   function renderSubCard(s) {
@@ -2407,6 +2407,49 @@ function renderSubscriptions() {
   }
 
   $('subsList').innerHTML = html;
+}
+
+function getCycleDaysLeft(s) {
+  if (s.platform !== 'YouTube Premium') return -1;
+  var months = parseInt(s.duration) || 0;
+  if (months <= 1 || s.days_left < 0) return -1;
+  var start = new Date(s.start_date || s.order_date);
+  var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
+  var elapsed = Math.floor((now - start) / 86400000);
+  if (elapsed < 0) return -1;
+  var inCycle = elapsed % 30;
+  var left = 30 - inCycle;
+  return left === 30 ? 0 : left;
+}
+
+function renderDashboardCycle() {
+  var subs = getSubscriptions().filter(function(s) {
+    var cl = getCycleDaysLeft(s);
+    return cl >= 0 && cl <= 3;
+  });
+  if (!$('dashCycle')) return;
+  if (subs.length === 0) {
+    $('dashCycleCard').style.display = 'none';
+    return;
+  }
+  $('dashCycleCard').style.display = '';
+  var html = '';
+  subs.forEach(function(s) {
+    var cl = getCycleDaysLeft(s);
+    var daysCls = cl <= 1 ? 'text-red' : 'text-yellow';
+    var daysText = cl === 0 ? '今天' : cl + '天';
+    var who = s.customer || s.buyer || '';
+    html += '<div class="dash-expiry-item">' +
+      '<div class="de-days ' + daysCls + '">' + daysText + '</div>' +
+      '<div class="de-info">' +
+        '<div class="de-product">' + esc(s.version || s.platform) + (s.duration ? ' (' + esc(s.duration) + ')' : '') + '</div>' +
+        (who ? '<div class="de-buyer">👤 ' + esc(who) + '</div>' : '') +
+        (s.account_info ? '<div class="de-buyer">🔑 ' + esc(s.account_info) + '</div>' : '') +
+      '</div>' +
+      '<div class="de-expiry">' + s.expiry_date + '</div>' +
+    '</div>';
+  });
+  $('dashCycle').innerHTML = html;
 }
 
 function renderDashboardExpiry() {

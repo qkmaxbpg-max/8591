@@ -148,7 +148,9 @@ select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .filter-tags{display:flex;gap:6px;flex-wrap:wrap}
 .filter-tag{padding:5px 14px;border:1px solid var(--bg4);border-radius:20px;background:var(--bg2);color:var(--fg2);font-size:.78rem;cursor:pointer;transition:var(--transition);white-space:nowrap;user-select:none}
 .filter-tag:hover{border-color:var(--fg3);color:var(--fg1);background:var(--bg3)}
+.filter-tag{position:relative}
 .filter-tag.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent);font-weight:600}
+.filter-badge{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:.65rem;font-weight:700;line-height:16px;text-align:center}
 /* Legacy search-group compat */
 .search-group{display:flex;gap:8px;flex:1;min-width:200px;flex-wrap:wrap}
 .search-group input,.search-group select{padding:7px 12px;border:1px solid var(--bg4);border-radius:var(--radius-sm);background:var(--bg2);color:var(--fg0);font-size:.85rem;outline:none}
