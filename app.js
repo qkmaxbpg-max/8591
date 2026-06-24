@@ -2,7 +2,7 @@
 var SUPABASE_URL='https://hpajiexvcmkidbgreaqy.supabase.co';
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwYWppZXh2Y21raWRiZ3JlYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTY2NTQsImV4cCI6MjA5NDU5MjY1NH0.ZIxx-cJRHxLAv-TlPpjvFGBndzs-GE9ptZENh81AQQQ';
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
-var SHOPEE_FEE = 0.10; // 蝦皮預設 10%
+var SHOPEE_FEE = 0.15; // 蝦皮預設 15%
 var sb = null, userId = null, isDemo = false;
 var stores = [], storeId = null;
 var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [], serviceAccounts = [];
