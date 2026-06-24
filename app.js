@@ -174,8 +174,12 @@ function renderStoreSwitcher() {
   });
   el.innerHTML = html;
   var cur = stores.filter(function(s){return s.id===storeId})[0];
-  var titleEl = document.querySelector('.app-title');
-  if (titleEl && cur) titleEl.textContent = cur.name;
+  if (cur) {
+    var titleEl = document.querySelector('.app-title');
+    if (titleEl) titleEl.textContent = cur.name;
+    var logoEl = document.querySelector('.logo-img');
+    if (logoEl) logoEl.src = cur.avatar || 'icon.png';
+  }
 }
 function storeFilter(query) {
   return storeId ? query.eq('store_id', storeId) : query;
