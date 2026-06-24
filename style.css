@@ -439,7 +439,9 @@ th.sticky-col{background:var(--bg2)}
 .sub-tl-item.future{color:var(--accent)}
 .sub-tl-acct{font-size:.75rem;color:var(--accent);margin-left:4px;word-break:break-all}
 .seat-notes{font-size:.75rem;color:var(--fg3);margin-top:2px;font-style:italic}
-.sub-cycle{font-size:.78rem;color:var(--fg2);margin-top:3px}
+.sub-cycle{font-size:.78rem;color:var(--fg2);margin-top:3px;display:flex;align-items:center;gap:6px}
+.sub-cycle.dimmed{opacity:.5}
+.btn.xs{padding:2px 8px;font-size:.7rem;border-radius:var(--radius-sm)}
 
 /* Dashboard expiry section */
 #dashExpiryCard .card-head{display:flex;justify-content:space-between;align-items:center}

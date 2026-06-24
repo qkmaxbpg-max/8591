@@ -2163,7 +2163,7 @@ function renderSubscriptions() {
     }
   });
 
-  var cycleCount = subs.filter(function(s) { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3; }).length;
+  var cycleCount = subs.filter(function(s) { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3 && !isCycleDismissed(s); }).length;
   var badge = $('cycleBadge');
   if (badge) {
     if (cycleCount > 0) { badge.style.display = ''; badge.textContent = cycleCount; }
@@ -2311,8 +2311,10 @@ function renderSubscriptions() {
   function cycleTag(s) {
     var cl = getCycleDaysLeft(s);
     if (cl < 0) return '';
+    if (isCycleDismissed(s)) return '<div class="sub-cycle dimmed">✅ 已提醒</div>';
     var cls = cl <= 2 ? 'text-red' : cl <= 5 ? 'text-yellow' : 'text-green';
-    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + cl + ' 天</span></div>';
+    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + cl + ' 天</span>' +
+      ' <button class="btn xs ghost" onclick="event.stopPropagation();dismissCycle(\'' + s.id + '\')">已提醒</button></div>';
   }
 
   function renderSubCard(s) {
@@ -2421,11 +2423,29 @@ function getCycleDaysLeft(s) {
   var left = 30 - inCycle;
   return left === 30 ? 0 : left;
 }
+function getCycleNum(s) {
+  var start = new Date(s.start_date || s.order_date);
+  var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
+  var elapsed = Math.floor((now - start) / 86400000);
+  return Math.floor(elapsed / 30);
+}
+function isCycleDismissed(s) {
+  var key = 'cycleDismiss_' + s.id + '_' + getCycleNum(s);
+  return localStorage.getItem(key) === '1';
+}
+function dismissCycle(id) {
+  var subs = getSubscriptions();
+  var s = subs.filter(function(x) { return x.id === id; })[0];
+  if (!s) return;
+  localStorage.setItem('cycleDismiss_' + id + '_' + getCycleNum(s), '1');
+  renderDashboardCycle();
+  renderSubscriptions();
+}
 
 function renderDashboardCycle() {
   var subs = getSubscriptions().filter(function(s) {
     var cl = getCycleDaysLeft(s);
-    return cl >= 0 && cl <= 3;
+    return cl >= 0 && cl <= 3 && !isCycleDismissed(s);
   });
   if (!$('dashCycle')) return;
   if (subs.length === 0) {
@@ -2446,7 +2466,7 @@ function renderDashboardCycle() {
         (who ? '<div class="de-buyer">👤 ' + esc(who) + '</div>' : '') +
         (s.account_info ? '<div class="de-buyer">🔑 ' + esc(s.account_info) + '</div>' : '') +
       '</div>' +
-      '<div class="de-expiry">' + s.expiry_date + '</div>' +
+      '<button class="btn sm ghost" onclick="dismissCycle(\'' + s.id + '\')">已提醒</button>' +
     '</div>';
   });
   $('dashCycle').innerHTML = html;
