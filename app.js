@@ -175,10 +175,8 @@ function renderStoreSwitcher() {
   el.innerHTML = html;
   var cur = stores.filter(function(s){return s.id===storeId})[0];
   if (cur) {
-    var titleEl = document.querySelector('.app-title');
-    if (titleEl) titleEl.textContent = cur.name;
-    var logoEl = document.querySelector('.logo-img');
-    if (logoEl) logoEl.src = cur.avatar || 'icon.png';
+    if ($('appTitle')) $('appTitle').textContent = cur.name;
+    if ($('appLogo')) $('appLogo').src = cur.avatar || 'icon.png';
   }
 }
 function storeFilter(query) {
