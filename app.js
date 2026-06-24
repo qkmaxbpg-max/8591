@@ -175,8 +175,15 @@ function renderStoreSwitcher() {
   el.innerHTML = html;
   var cur = stores.filter(function(s){return s.id===storeId})[0];
   if (cur) {
-    if ($('appTitle')) $('appTitle').textContent = cur.name;
-    if ($('appLogo')) $('appLogo').src = cur.avatar || 'icon.png';
+    var av = cur.avatar || 'icon.png';
+    var topLeft = document.querySelector('#topBar .top-left');
+    if (topLeft) {
+      var logoImg = topLeft.querySelector('img');
+      if (logoImg) logoImg.setAttribute('src', av);
+      var titleSpan = topLeft.querySelector('.app-title') || $('appTitle');
+      if (titleSpan) titleSpan.textContent = cur.name;
+    }
+    document.title = cur.name;
   }
 }
 function storeFilter(query) {
