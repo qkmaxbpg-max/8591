@@ -3,6 +3,10 @@ var SUPABASE_URL='https://hpajiexvcmkidbgreaqy.supabase.co';
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwYWppZXh2Y21raWRiZ3JlYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTY2NTQsImV4cCI6MjA5NDU5MjY1NH0.ZIxx-cJRHxLAv-TlPpjvFGBndzs-GE9ptZENh81AQQQ';
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.15; // 蝦皮預設 15%
+function getShopFee() {
+  var cur = stores.filter(function(s){return s.id===storeId})[0];
+  return cur && cur.shopee_fee != null ? Number(cur.shopee_fee) : SHOPEE_FEE;
+}
 var sb = null, userId = null, isDemo = false;
 var stores = [], storeId = null;
 var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [], serviceAccounts = [];
@@ -260,7 +264,7 @@ function confirmAction(msg, cb) {
 /* ──── Calc helpers ──── */
 function channelFee(channel, unitPrice) {
   if (channel === '8591') return unitPrice * PLATFORM_FEE;
-  if (channel === '蝦皮') return unitPrice * SHOPEE_FEE;
+  if (channel === '蝦皮') return unitPrice * getShopFee();
   return 0;
 }
 function calcCommission(gross, commType, commVal) {
@@ -692,7 +696,7 @@ function renderProducts() {
         var fee8591 = p.price * PLATFORM_FEE;
         var prof8591 = p.price - p.cost - fee8591;
         var sp = p.shopee_price || 0;
-        var feeShopee = sp * SHOPEE_FEE;
+        var feeShopee = sp * getShopFee();
         var profShopee = sp > 0 ? sp - p.cost - feeShopee : 0;
         html += '<tr><td>' + esc(p.version) + '</td><td>' + esc(p.duration) + '</td>' +
           '<td class="text-right">' + fmtN(p.cost) + '</td>' +
@@ -747,10 +751,11 @@ function updateProdPreview() {
   var sp = Number($('pm_shopeePrice').value) || 0;
   var fee8591 = price * PLATFORM_FEE;
   var prof8591 = price - cost - fee8591;
-  var feeShopee = sp * SHOPEE_FEE;
+  var sf = getShopFee();
+  var feeShopee = sp * sf;
   var profShopee = sp - cost - feeShopee;
   var h = '<div class="row"><span class="lbl">8591 淨利</span><span class="val ' + (prof8591 >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(prof8591) + '（手續費 ' + (PLATFORM_FEE * 100) + '% = NT$' + fmtN(fee8591) + '）</span></div>';
-  if (sp > 0) h += '<div class="row"><span class="lbl">蝦皮 淨利</span><span class="val ' + (profShopee >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(profShopee) + '（手續費 ' + (SHOPEE_FEE * 100) + '% = NT$' + fmtN(feeShopee) + '）</span></div>';
+  if (sp > 0) h += '<div class="row"><span class="lbl">蝦皮 淨利</span><span class="val ' + (profShopee >= 0 ? 'text-green' : 'text-red') + '">NT$' + fmtN(profShopee) + '（手續費 ' + (sf * 100) + '% = NT$' + fmtN(feeShopee) + '）</span></div>';
   h += '<div class="row"><span class="lbl">個人 淨利</span><span class="val text-green highlight">NT$' + fmtN(price - cost) + '</span></div>';
   $('prodPreview').innerHTML = h;
 }
@@ -1343,7 +1348,7 @@ function saveOrder() {
     unit_price: Number($('om_unitPrice').value) || 0,
     unit_cost: Number($('om_unitCost').value) || 0,
     fee_type: '百分比',
-    fee_value: ch === '8591' ? PLATFORM_FEE : ch === '蝦皮' ? SHOPEE_FEE : 0,
+    fee_value: ch === '8591' ? PLATFORM_FEE : ch === '蝦皮' ? getShopFee() : 0,
     commission_type: ag ? ag.commission_type : '百分比',
     commission_value: ag ? ag.commission_value : 0,
     start_date: dpGetVal('om_startDate') || null,
