@@ -5,7 +5,9 @@ var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.15; // 蝦皮預設 15%
 function getShopFee() {
   var cur = stores.filter(function(s){return s.id===storeId})[0];
-  return cur && cur.shopee_fee != null ? Number(cur.shopee_fee) : SHOPEE_FEE;
+  if (!cur) return SHOPEE_FEE;
+  if ('shopee_fee' in cur) { var v = Number(cur.shopee_fee); return isNaN(v) ? SHOPEE_FEE : v; }
+  return SHOPEE_FEE;
 }
 var sb = null, userId = null, isDemo = false;
 var stores = [], storeId = null;
