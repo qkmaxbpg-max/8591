@@ -4,6 +4,7 @@ var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.10; // 蝦皮預設 10%
 var sb = null, userId = null, isDemo = false;
+var stores = [], storeId = null;
 var products = [], agents = [], customers = [], orders = [], ads = [], adConfigs = [], serviceAccounts = [];
 var renewExpiryBase = '';
 
@@ -81,7 +82,7 @@ function doSignup() {
 }
 function doLogout() {
   if (sb) sb.auth.signOut();
-  userId = null; isDemo = false;
+  userId = null; isDemo = false; stores = []; storeId = null;
   $('app').style.display = 'none';
   $('loginPage').style.display = '';
 }
@@ -101,7 +102,7 @@ function enterApp(label) {
   mpInit('mpDash', renderDashboard);
   mpInit('mpOrders', renderOrders);
   mpInit('mpExp', renderAds);
-  loadAll();
+  loadStores();
   // Share auth token with Chrome extension (if installed)
   shareTokenWithExtension();
 }
@@ -140,15 +141,54 @@ function demoSave() {
   localStorage.setItem('proxy-demo-svcaccounts', JSON.stringify(serviceAccounts));
 }
 
+function loadStores() {
+  if (isDemo) { stores = []; storeId = null; loadAll(); return; }
+  sb.from('stores').select('*').eq('user_id', userId).order('sort_order').then(function(res) {
+    stores = (res.data || []);
+    var saved = localStorage.getItem('proxy-storeId-' + userId);
+    if (saved && stores.some(function(s) { return s.id === saved; })) storeId = saved;
+    else if (stores.length > 0) storeId = (stores.filter(function(s){return s.is_default})[0] || stores[0]).id;
+    else storeId = null;
+    renderStoreSwitcher();
+    loadAll();
+  }).catch(function() { stores = []; storeId = null; loadAll(); });
+}
+function switchStore(id) {
+  if (id === storeId) return;
+  storeId = id;
+  localStorage.setItem('proxy-storeId-' + userId, id);
+  renderStoreSwitcher();
+  loadAll();
+  toast('已切換至 ' + (stores.filter(function(s){return s.id===id})[0] || {}).name, 'ok');
+}
+function renderStoreSwitcher() {
+  var el = $('storeSwitcher');
+  if (!el || stores.length < 2) { if (el) el.style.display = 'none'; return; }
+  el.style.display = '';
+  var html = '';
+  stores.forEach(function(s) {
+    var active = s.id === storeId;
+    html += '<div class="store-avatar' + (active ? ' active' : '') + '" onclick="switchStore(\'' + s.id + '\')" title="' + esc(s.name) + '">' +
+      '<img src="' + esc(s.avatar || 'icon.png') + '" alt="' + esc(s.name) + '">' +
+    '</div>';
+  });
+  el.innerHTML = html;
+  var cur = stores.filter(function(s){return s.id===storeId})[0];
+  var titleEl = document.querySelector('.app-title');
+  if (titleEl && cur) titleEl.textContent = cur.name;
+}
+function storeFilter(query) {
+  return storeId ? query.eq('store_id', storeId) : query;
+}
 function loadAll() {
   if (isDemo) { renderAll(); return }
   Promise.all([
-    sb.from('products').select('*').eq('user_id', userId).order('sort_order'),
-    sb.from('agents').select('*').eq('user_id', userId).order('created_at'),
-    sb.from('customers').select('*').eq('user_id', userId).order('created_at'),
-    sb.from('orders').select('*').eq('user_id', userId).order('order_date', { ascending: false }),
-    sb.from('ad_spends').select('*').eq('user_id', userId).order('ad_date', { ascending: false }),
-    sb.from('service_accounts').select('*').eq('user_id', userId).order('created_at')
+    storeFilter(sb.from('products').select('*').eq('user_id', userId)).order('sort_order'),
+    storeFilter(sb.from('agents').select('*').eq('user_id', userId)).order('created_at'),
+    storeFilter(sb.from('customers').select('*').eq('user_id', userId)).order('created_at'),
+    storeFilter(sb.from('orders').select('*').eq('user_id', userId)).order('order_date', { ascending: false }),
+    storeFilter(sb.from('ad_spends').select('*').eq('user_id', userId)).order('ad_date', { ascending: false }),
+    storeFilter(sb.from('service_accounts').select('*').eq('user_id', userId)).order('created_at')
   ]).then(function(res) {
     res.forEach(function(r, i) {
       if (r && r.error) console.warn('Table load error [' + i + ']:', r.error.message);
@@ -160,8 +200,7 @@ function loadAll() {
     ads = res[4].data || [];
     serviceAccounts = (res[5] && res[5].data) || [];
     renderAll();
-    // ad_configs loaded separately — re-render ads tab when ready
-    sb.from('ad_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }).then(function(r2) {
+    storeFilter(sb.from('ad_configs').select('*').eq('user_id', userId)).order('created_at', { ascending: false }).then(function(r2) {
       if (r2 && r2.data) { adConfigs = r2.data; renderAds(); renderDashboard(); }
     }).catch(function() { adConfigs = []; });
   }).catch(function(err) {
@@ -723,7 +762,8 @@ function saveProduct() {
     fee_value: PLATFORM_FEE,
     status: $('pm_status').value,
     required_info: $('pm_reqInfo').value.trim(),
-    notes: $('pm_notes').value.trim()
+    notes: $('pm_notes').value.trim(),
+    store_id: storeId
   };
   if (!obj.platform) return toast('請填寫平台/商品名稱', 'err');
   var id = $('pm_id').value;
@@ -1251,7 +1291,7 @@ function resolveCustomer(name, callback) {
     return callback(nc.id);
   }
 
-  sb.from('customers').insert({ user_id: userId, name: name, contact: '', platform: '', notes: '自動建立' })
+  sb.from('customers').insert({ user_id: userId, store_id: storeId, name: name, contact: '', platform: '', notes: '自動建立' })
     .select().then(function(res) {
       if (res.error) { toast('建立客戶失敗：' + res.error.message, 'err'); return callback(null); }
       var nc = res.data[0];
@@ -1302,7 +1342,8 @@ function saveOrder() {
     account_info: $('om_accountInfo').value.trim(),
     notes: $('om_notes').value.trim(),
     service_account_id: $('om_svcAcct').value || null,
-    seat_number: $('om_seat').value ? Number($('om_seat').value) : null
+    seat_number: $('om_seat').value ? Number($('om_seat').value) : null,
+    store_id: storeId
   };
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
 
@@ -1448,7 +1489,8 @@ function saveAgent() {
     name: $('am_name').value.trim(),
     commission_type: $('am_commType').value,
     commission_value: Number($('am_commVal').value) || 0,
-    notes: $('am_notes').value.trim()
+    notes: $('am_notes').value.trim(),
+    store_id: storeId
   };
   if (!obj.name) return toast('請填寫名稱', 'err');
   var id = $('am_id').value;
@@ -1540,7 +1582,8 @@ function saveCustomer() {
     name: $('cm_name').value.trim(),
     contact: $('cm_contact').value.trim(),
     platform: $('cm_platform').value.trim(),
-    notes: $('cm_notes').value.trim()
+    notes: $('cm_notes').value.trim(),
+    store_id: storeId
   };
   if (!obj.name) return toast('請填寫名稱', 'err');
   var id = $('cm_id').value;
@@ -1737,7 +1780,8 @@ function saveAdConfig() {
     start_date: dpGetVal('adc_start'),
     end_date: noEnd ? null : (dpGetVal('adc_end') || null),
     notes: $('adc_notes').value.trim(),
-    active: true
+    active: true,
+    store_id: storeId
   };
   if (!obj.platform) return toast('請填寫廣告平台', 'err');
   if (!obj.daily_cost) return toast('請填寫每日金額', 'err');
@@ -1935,7 +1979,8 @@ function saveSvcAccount() {
     email: email,
     max_seats: Number($('sa_maxSeats').value) || 5,
     notes: $('sa_notes').value.trim(),
-    status: $('sa_status').value
+    status: $('sa_status').value,
+    store_id: storeId
   };
   var id = $('sa_id').value;
   if (isDemo) {
@@ -3064,7 +3109,8 @@ function importOcrOrders() {
       fee_value: PLATFORM_FEE,
       commission_type: '百分比',
       commission_value: 0,
-      notes: '截圖匯入' + (o.buyer ? ' | 買家' + o.buyer : '')
+      notes: '截圖匯入' + (o.buyer ? ' | 買家' + o.buyer : ''),
+      store_id: storeId
     };
   });
 

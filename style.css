@@ -100,6 +100,11 @@ select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .top-left{display:flex;align-items:center;gap:8px}
 .logo{font-size:1.3rem}
 .app-title{font-weight:700;font-size:1.1rem}
+.store-switcher{display:flex;gap:4px;margin-left:4px}
+.store-avatar{width:30px;height:30px;border-radius:50%;overflow:hidden;cursor:pointer;border:2px solid transparent;opacity:.45;transition:var(--transition);flex-shrink:0}
+.store-avatar.active{border-color:var(--accent);opacity:1}
+.store-avatar:hover{opacity:.85}
+.store-avatar img{width:100%;height:100%;object-fit:cover}
 .top-right{display:flex;align-items:center;gap:8px}
 .user-label{font-size:.8rem;color:var(--fg2)}
 
