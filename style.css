@@ -272,6 +272,7 @@ th.sticky-col{background:var(--bg2)}
 .prod-arrow{font-size:.7rem;color:var(--fg2);width:14px}
 .prod-plat-name{font-weight:600;font-size:.95rem;flex:1}
 .prod-count{font-size:.75rem;color:var(--fg2)}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .prod-table{margin:0;white-space:nowrap;min-width:820px}
 .prod-table thead th{padding:6px 12px;background:var(--bg1)}
 .prod-table td{padding:6px 12px}

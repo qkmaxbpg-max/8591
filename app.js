@@ -678,7 +678,7 @@ function renderProducts() {
         '<span class="prod-count">' + activeCount + '/' + items.length + ' 啟用</span>' +
       '</div>';
     if (isOpen) {
-      html += '<table class="prod-table"><thead><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr></thead><tbody>';
+      html += '<div class="table-scroll"><table class="prod-table"><thead><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr></thead><tbody>';
       items.forEach(function(p) {
         var fee8591 = p.price * PLATFORM_FEE;
         var prof8591 = p.price - p.cost - fee8591;
@@ -698,7 +698,7 @@ function renderProducts() {
             '<button class="act-btn del" data-action="deleteProduct" data-id="' + p.id + '">刪除</button>' +
           '</div></td></tr>';
       });
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
     }
     html += '</div>';
   });
@@ -973,7 +973,7 @@ function renderOrders() {
     $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
     return;
   }
-  var h = '<table style="min-width:1100px"><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th class="sticky-col">操作</th></tr>';
+  var h = '<div class="table-scroll"><table style="min-width:1100px"><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th class="sticky-col">操作</th></tr>';
   list.forEach(function(o) {
     var p = orderProfit(o);
     var expiry = o.expiry_date || '';
@@ -1001,7 +1001,7 @@ function renderOrders() {
         '<button class="act-btn del" data-action="deleteOrder" data-id="' + o.id + '">刪除</button>' +
       '</div></td></tr>';
   });
-  $('orderList').innerHTML = h + '</table>';
+  $('orderList').innerHTML = h + '</table></div>';
 }
 function getAgentName(id) {
   if (!id) return '';
