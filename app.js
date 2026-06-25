@@ -648,7 +648,7 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   var el = $('revenueChart');
   if (!el) return;
   if (isAll || isYear || completed.length === 0) {
-    el.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--fg2)">選擇單月份查看每日營收折線圖</div>';
+    el.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--fg2)">選擇單月份查看每日淨利折線圖</div>';
     return;
   }
   var year = parseInt(ym.slice(0,4)), month = parseInt(ym.slice(5,7));
@@ -658,7 +658,7 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   for (var d = 1; d <= lastDay; d++) {
     var ds = ym + '-' + (d < 10 ? '0' + d : '' + d);
     var rev = 0;
-    completed.forEach(function(o) { if (o.order_date === ds) rev += orderProfit(o).rev; });
+    completed.forEach(function(o) { if (o.order_date === ds) rev += orderProfit(o).profit; });
     daily.push(rev);
     labels.push(d);
   }
