@@ -546,7 +546,7 @@ function _renderDashboard() {
     if (isYear) return d.slice(0, 4) === yy;
     return d.slice(0, 7) === ym;
   });
-  var completed = filtered.filter(function(o) { return o.status === '已完成' });
+  var completed = filtered;
 
   var totalRev = 0, totalCost = 0, totalFee = 0, totalComm = 0;
   completed.forEach(function(o) {
@@ -564,7 +564,7 @@ function _renderDashboard() {
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
 
   var td = today();
-  var todayCompleted = orders.filter(function(o) { return o.status === '已完成' && o.order_date === td });
+  var todayCompleted = orders.filter(function(o) { return o.order_date === td });
   var todayRev = 0, todayProf = 0;
   todayCompleted.forEach(function(o) { var p = orderProfit(o); todayRev += p.rev; todayProf += p.profit });
 
@@ -749,7 +749,7 @@ function statCard(label, value, sub, cls) {
     (sub ? '<div class="sub-val">' + sub + '</div>' : '') + '</div>';
 }
 function statusBadge(s) {
-  var cls = s === '已完成' ? 'ok' : s === '處理中' ? 'pending' : s === '已退款' ? 'refund' : 'cancel';
+  var cls = s === '已完成' ? 'ok' : s === '處理中' ? 'pending' : s === '未付款' ? 'pending' : s === '已退款' ? 'refund' : 'cancel';
   return '<span class="badge ' + cls + '">' + s + '</span>';
 }
 function channelBadge(ch) {
@@ -1535,7 +1535,7 @@ function renderAgents() {
   }
   var h = '';
   agents.forEach(function(a) {
-    var agOrders = orders.filter(function(o) { return String(o.agent_id) === String(a.id) && o.status === '已完成' });
+    var agOrders = orders.filter(function(o) { return String(o.agent_id) === String(a.id) });
     var totalProfit = 0, totalComm = 0;
     agOrders.forEach(function(o) {
       var p = orderProfit(o);
@@ -3056,7 +3056,7 @@ function callClaudeVision(base64, mediaType) {
     '- qty: 數量（數字）\n' +
     '- unit_price: 售價（數字，不含$符號）\n' +
     '- buyer: 買家編號\n' +
-    '- status: 狀態（已完成/處理中/已取消/已退款）\n\n' +
+    '- status: 狀態（已完成/處理中/未付款/已取消/已退款）\n\n' +
     '請直接回傳 JSON 陣列格式，不要加任何說明文字，格式如下：\n' +
     '[{"order_date":"2026-06-07","platform":"Discord Nitro","version":"加成3個月 - 2次","qty":1,"unit_price":320,"buyer":"No.3492787","status":"已完成"}]';
 
