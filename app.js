@@ -694,15 +694,53 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   var hoverRects = points.map(function(p, i) {
     var rw = i === 0 || i === points.length-1 ? stepX/2 : stepX;
     var rx = p.x - rw/2;
-    return '<rect x="' + rx.toFixed(1) + '" y="' + padT + '" width="' + rw.toFixed(1) + '" height="' + cH + '" fill="transparent">' +
-      '<title>' + month + '/' + p.d + '  NT$' + fmtN(p.v) + '</title></rect>';
+    return '<rect x="' + rx.toFixed(1) + '" y="' + padT + '" width="' + rw.toFixed(1) + '" height="' + cH + '" fill="transparent" ' +
+      'data-idx="' + i + '" class="rv-hover"/>';
   }).join('');
-  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' +
+  var tooltip = '<g id="rvTip" style="display:none;pointer-events:none">' +
+    '<rect rx="4" ry="4" fill="var(--bg2)" stroke="var(--bg4)" stroke-width="1" id="rvTipBg"/>' +
+    '<text id="rvTipDate" font-size="10" fill="var(--fg2)" text-anchor="middle"></text>' +
+    '<text id="rvTipVal" font-size="12" font-weight="600" fill="var(--fg0)" text-anchor="middle"></text>' +
+  '</g>';
+  var highlightDot = '<circle id="rvDotHL" r="5" fill="var(--accent)" stroke="var(--bg1)" stroke-width="2" style="display:none;pointer-events:none"/>';
+  var guideLine = '<line id="rvGuide" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,3" style="display:none;pointer-events:none"/>';
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" id="rvSvg">' +
     gridLines + xLabels +
     '<path d="' + areaD + '" fill="var(--accent-dim)" opacity="0.5"/>' +
     '<path d="' + pathD + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-    dots + hoverRects +
+    dots + guideLine + highlightDot + hoverRects + tooltip +
   '</svg>';
+  var pts = points, mo = month;
+  el.querySelector('#rvSvg').addEventListener('mousemove', function(e) {
+    var svg = this, rect = svg.getBoundingClientRect();
+    var scaleX = W / rect.width;
+    var mx = (e.clientX - rect.left) * scaleX;
+    var closest = 0, minD = 9999;
+    pts.forEach(function(p, i) { var d = Math.abs(p.x - mx); if (d < minD) { minD = d; closest = i; } });
+    var p = pts[closest];
+    var tip = svg.querySelector('#rvTip'), bg = svg.querySelector('#rvTipBg');
+    var dt = svg.querySelector('#rvTipDate'), vl = svg.querySelector('#rvTipVal');
+    var hl = svg.querySelector('#rvDotHL'), gl = svg.querySelector('#rvGuide');
+    dt.textContent = mo + '/' + p.d;
+    vl.textContent = 'NT$' + fmtN(p.v);
+    var tw = Math.max(dt.textContent.length, vl.textContent.length) * 7 + 16;
+    var th = 38;
+    var tx = p.x, ty = p.y - th - 10;
+    if (ty < 5) ty = p.y + 15;
+    if (tx - tw/2 < padL) tx = padL + tw/2;
+    if (tx + tw/2 > W - padR) tx = W - padR - tw/2;
+    bg.setAttribute('x', tx - tw/2); bg.setAttribute('y', ty); bg.setAttribute('width', tw); bg.setAttribute('height', th);
+    dt.setAttribute('x', tx); dt.setAttribute('y', ty + 14);
+    vl.setAttribute('x', tx); vl.setAttribute('y', ty + 30);
+    tip.style.display = ''; hl.style.display = ''; gl.style.display = '';
+    hl.setAttribute('cx', p.x); hl.setAttribute('cy', p.y);
+    gl.setAttribute('x1', p.x); gl.setAttribute('y1', padT); gl.setAttribute('x2', p.x); gl.setAttribute('y2', padT + cH);
+  });
+  el.querySelector('#rvSvg').addEventListener('mouseleave', function() {
+    this.querySelector('#rvTip').style.display = 'none';
+    this.querySelector('#rvDotHL').style.display = 'none';
+    this.querySelector('#rvGuide').style.display = 'none';
+  });
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
