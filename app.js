@@ -710,7 +710,8 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
     '<path d="' + pathD + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     dots + guideLine + highlightDot + hoverRects + tooltip +
   '</svg>';
-  var pts = points, mo = month;
+  var pts = points, mo = month, yr = year;
+  var weekDay = ['日','一','二','三','四','五','六'];
   el.querySelector('#rvSvg').addEventListener('mousemove', function(e) {
     var svg = this, rect = svg.getBoundingClientRect();
     var scaleX = W / rect.width;
@@ -721,7 +722,8 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
     var tip = svg.querySelector('#rvTip'), bg = svg.querySelector('#rvTipBg');
     var dt = svg.querySelector('#rvTipDate'), vl = svg.querySelector('#rvTipVal');
     var hl = svg.querySelector('#rvDotHL'), gl = svg.querySelector('#rvGuide');
-    dt.textContent = mo + '/' + p.d;
+    var wd = weekDay[new Date(yr, mo - 1, p.d).getDay()];
+    dt.textContent = mo + '/' + p.d + '(' + wd + ')';
     vl.textContent = 'NT$' + fmtN(p.v);
     var tw = Math.max(dt.textContent.length, vl.textContent.length) * 7 + 16;
     var th = 38;
