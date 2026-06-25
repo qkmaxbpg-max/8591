@@ -2480,9 +2480,9 @@ function getCycleDaysLeft(s) {
   var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
   var elapsed = Math.floor((now - start) / 86400000);
   if (elapsed < 0) return -1;
+  if (elapsed === 0) return 30;
   var inCycle = elapsed % 30;
-  var left = 30 - inCycle;
-  return left === 30 ? 0 : left;
+  return inCycle === 0 ? 0 : 30 - inCycle;
 }
 function getCycleNum(s) {
   var start = new Date(s.start_date || s.order_date);
