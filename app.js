@@ -637,9 +637,72 @@ function _renderDashboard() {
     $('recentOrders').innerHTML = h + '</table>';
   }
 
+  // Revenue line chart
+  renderRevenueChart(completed, ym, isAll, isYear, yy);
+
   // Dashboard expiry & cycle sections
   renderDashboardExpiry();
   renderDashboardCycle();
+}
+function renderRevenueChart(completed, ym, isAll, isYear, yy) {
+  var el = $('revenueChart');
+  if (!el) return;
+  if (isAll || isYear || completed.length === 0) {
+    el.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--fg2)">選擇單月份查看每日營收折線圖</div>';
+    return;
+  }
+  var year = parseInt(ym.slice(0,4)), month = parseInt(ym.slice(5,7));
+  var td = today();
+  var lastDay = td.slice(0,7) === ym ? parseInt(td.slice(8,10)) : new Date(year, month, 0).getDate();
+  var daily = [], labels = [];
+  for (var d = 1; d <= lastDay; d++) {
+    var ds = ym + '-' + (d < 10 ? '0' + d : '' + d);
+    var rev = 0;
+    completed.forEach(function(o) { if (o.order_date === ds) rev += orderProfit(o).rev; });
+    daily.push(rev);
+    labels.push(d);
+  }
+  if (daily.length === 0) { el.innerHTML = ''; return; }
+  var maxV = Math.max.apply(null, daily) || 1;
+  var W = 600, H = 200, padL = 55, padR = 15, padT = 20, padB = 30;
+  var cW = W - padL - padR, cH = H - padT - padB;
+  var stepX = daily.length > 1 ? cW / (daily.length - 1) : cW;
+  var points = daily.map(function(v, i) {
+    var x = padL + i * stepX;
+    var y = padT + cH - (v / maxV) * cH;
+    return { x: x, y: y, v: v, d: labels[i] };
+  });
+  var pathD = points.map(function(p, i) { return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
+  var areaD = pathD + ' L' + points[points.length-1].x.toFixed(1) + ',' + (padT+cH) + ' L' + points[0].x.toFixed(1) + ',' + (padT+cH) + ' Z';
+  var gridLines = '';
+  for (var g = 0; g <= 4; g++) {
+    var gy = padT + cH - (g / 4) * cH;
+    var gv = Math.round(maxV * g / 4);
+    gridLines += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W-padR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--bg4)" stroke-width="0.5"/>';
+    gridLines += '<text x="' + (padL-6) + '" y="' + (gy+4).toFixed(1) + '" text-anchor="end" fill="var(--fg3)" font-size="10">' + (gv >= 1000 ? (gv/1000).toFixed(0) + 'k' : gv) + '</text>';
+  }
+  var xLabels = '';
+  var labelStep = daily.length <= 15 ? 1 : daily.length <= 20 ? 2 : 5;
+  points.forEach(function(p) {
+    if (p.d % labelStep === 0 || p.d === 1) {
+      xLabels += '<text x="' + p.x.toFixed(1) + '" y="' + (H-8) + '" text-anchor="middle" fill="var(--fg3)" font-size="10">' + p.d + '</text>';
+    }
+  });
+  var dots = points.map(function(p) {
+    return '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="var(--accent)" stroke="var(--bg1)" stroke-width="1.5"/>';
+  }).join('');
+  var hoverRects = points.map(function(p, i) {
+    var rw = i === 0 || i === points.length-1 ? stepX/2 : stepX;
+    var rx = p.x - rw/2;
+    return '<rect x="' + rx.toFixed(1) + '" y="' + padT + '" width="' + rw.toFixed(1) + '" height="' + cH + '" fill="transparent">' +
+      '<title>' + month + '/' + p.d + '  NT$' + fmtN(p.v) + '</title></rect>';
+  }).join('');
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' +
+    gridLines + xLabels +
+    '<path d="' + areaD + '" fill="var(--accent-dim)" opacity="0.5"/>' +
+    '<path d="' + pathD + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    dots + hoverRects +
+  '</svg>';
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
