@@ -267,7 +267,7 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label>成本/件</label><input id="om_unitCost" type="number" min="0" oninput="calcOrderPreview()"></div>
-      <div class="form-group"><label>狀態</label><select id="om_status"><option>處理中</option><option>已完成</option><option>未付款</option><option>已取消</option><option>已退款</option></select></div>
+      <div class="form-group"><label>狀態</label><div id="om_statusDrop"></div><input id="om_status" type="hidden"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>訂閱起始日</label><div id="om_startDate" class="dp-wrap"></div></div>
@@ -378,6 +378,17 @@
       <p class="hint">到 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得</p>
     </div>
     <hr style="border:none;border-top:1px solid var(--bg4);margin:16px 0">
+    <h4 style="margin-bottom:12px">訂單預設值</h4>
+    <p class="hint" style="margin-bottom:12px">新增訂單時自動帶入的預設欄位</p>
+    <div class="form-row">
+      <div class="form-group"><label>預設出單人</label><div id="set_defaultAgentDrop"></div><input id="set_defaultAgent" type="hidden"></div>
+      <div class="form-group"><label>預設銷售管道</label><div id="set_defaultChannelDrop"></div><input id="set_defaultChannel" type="hidden"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>預設狀態</label><div id="set_defaultStatusDrop"></div><input id="set_defaultStatus" type="hidden"></div>
+      <div class="form-group"></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--bg4);margin:16px 0">
     <h4 style="margin-bottom:12px">帳號管理（座位追蹤）</h4>
     <p class="hint" style="margin-bottom:12px">管理 Netflix、Spotify 等多人共用帳號，追蹤每個座位的使用狀態</p>
     <button class="btn primary sm" onclick="openSvcAccountModal()" style="margin-bottom:12px">＋ 新增帳號</button>
@@ -463,6 +474,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=100"></script>
+<script src="app.js?v=101"></script>
 </body>
 </html>

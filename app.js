@@ -1185,11 +1185,13 @@ function openOrderModal(item) {
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
   $('om_id').value = item ? item.id : '';
   dpInit('om_date', { value: item ? item.order_date : today() });
-  $('om_channel').value = item ? (item.channel || '8591') : '8591';
+  var defChannel = localStorage.getItem('proxy-default-channel') || '8591';
+  $('om_channel').value = item ? (item.channel || '8591') : defChannel;
 
   // Agent custom dropdown
+  var savedAgentId = localStorage.getItem('proxy-default-agent') || '';
   var selfAgent = agents.filter(function(a) { return a.name === '自己' })[0];
-  var defaultAgentId = selfAgent ? String(selfAgent.id) : '';
+  var defaultAgentId = savedAgentId || (selfAgent ? String(selfAgent.id) : '');
   var agItems = [];
   agents.forEach(function(a) {
     var agOrds = orders.filter(function(o) { return String(o.agent_id) === String(a.id) }).length;
@@ -1257,7 +1259,19 @@ function openOrderModal(item) {
   $('om_qty').value = item ? item.qty : 1;
   $('om_unitPrice').value = item ? item.unit_price : '';
   $('om_unitCost').value = item ? item.unit_cost : '';
-  $('om_status').value = item ? item.status : '已完成';
+  var statusItems = [
+    { value: '已完成', label: '已完成', icon: '✓', iconCls: 'accent' },
+    { value: '處理中', label: '處理中', icon: '⏳', iconCls: 'accent' },
+    { value: '未付款', label: '未付款', icon: '💰', iconCls: 'accent' },
+    { value: '已取消', label: '已取消', icon: '✕', iconCls: 'accent' },
+    { value: '已退款', label: '已退款', icon: '↩', iconCls: 'accent' }
+  ];
+  var defStatus = localStorage.getItem('proxy-default-status') || '已完成';
+  cdropInit('om_statusDrop', {
+    items: statusItems, placeholder: '選擇狀態', value: item ? item.status : defStatus,
+    onSelect: function(v) { $('om_status').value = v; }
+  });
+  $('om_status').value = item ? item.status : defStatus;
   dpInit('om_startDate', { value: item ? (item.start_date || item.order_date || '') : today(), allowEmpty: true });
   dpInit('om_expiry', { value: item ? (item.expiry_date || '') : '', allowEmpty: true });
   $('om_accountInfo').value = item ? (item.account_info || '') : '';
@@ -2261,6 +2275,36 @@ function openSettings() {
   $('set_ocrMode').onchange = function() {
     $('apiKeyGroup').style.display = this.value === 'ai' ? '' : 'none';
   };
+  // Order defaults
+  var defAgItems = agents.map(function(a) { return { value: String(a.id), label: a.name, icon: a.name.charAt(0), iconCls: 'accent' }; });
+  cdropInit('set_defaultAgentDrop', {
+    items: defAgItems, placeholder: '選擇出單人', value: localStorage.getItem('proxy-default-agent') || '',
+    onSelect: function(v) { $('set_defaultAgent').value = v; }
+  });
+  $('set_defaultAgent').value = localStorage.getItem('proxy-default-agent') || '';
+  var chItems = [
+    { value: '8591', label: '8591', icon: '🎮', iconCls: 'accent' },
+    { value: '蝦皮', label: '蝦皮', icon: '🛒', iconCls: 'accent' },
+    { value: '個人', label: '個人', icon: '👤', iconCls: 'accent' }
+  ];
+  cdropInit('set_defaultChannelDrop', {
+    items: chItems, placeholder: '選擇管道', value: localStorage.getItem('proxy-default-channel') || '8591',
+    onSelect: function(v) { $('set_defaultChannel').value = v; }
+  });
+  $('set_defaultChannel').value = localStorage.getItem('proxy-default-channel') || '8591';
+  var stItems = [
+    { value: '已完成', label: '已完成', icon: '✓', iconCls: 'accent' },
+    { value: '處理中', label: '處理中', icon: '⏳', iconCls: 'accent' },
+    { value: '未付款', label: '未付款', icon: '💰', iconCls: 'accent' },
+    { value: '已取消', label: '已取消', icon: '✕', iconCls: 'accent' },
+    { value: '已退款', label: '已退款', icon: '↩', iconCls: 'accent' }
+  ];
+  cdropInit('set_defaultStatusDrop', {
+    items: stItems, placeholder: '選擇狀態', value: localStorage.getItem('proxy-default-status') || '已完成',
+    onSelect: function(v) { $('set_defaultStatus').value = v; }
+  });
+  $('set_defaultStatus').value = localStorage.getItem('proxy-default-status') || '已完成';
+
   renderAccountManager();
   openModal('settingsModal');
 }
@@ -2270,6 +2314,11 @@ function saveSettings() {
   var key = $('set_apiKey').value.trim();
   if (key) localStorage.setItem('proxy-api-key', key);
   else localStorage.removeItem('proxy-api-key');
+  // Order defaults
+  var da = $('set_defaultAgent').value;
+  if (da) localStorage.setItem('proxy-default-agent', da); else localStorage.removeItem('proxy-default-agent');
+  localStorage.setItem('proxy-default-channel', $('set_defaultChannel').value || '8591');
+  localStorage.setItem('proxy-default-status', $('set_defaultStatus').value || '已完成');
   closeModal();
   toast('設定已儲存', 'ok');
 }
