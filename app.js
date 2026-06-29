@@ -751,9 +751,21 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   }
   svgEl.addEventListener('mousemove', function(e) { showTip(e.clientX); });
   svgEl.addEventListener('mouseleave', hideTip);
-  svgEl.addEventListener('touchstart', function(e) { e.preventDefault(); showTip(e.touches[0].clientX); }, { passive: false });
-  svgEl.addEventListener('touchmove', function(e) { e.preventDefault(); showTip(e.touches[0].clientX); }, { passive: false });
-  svgEl.addEventListener('touchend', function() { setTimeout(hideTip, 2000); });
+  var touchActive = false, longTimer = null;
+  svgEl.addEventListener('touchstart', function(e) {
+    var cx = e.touches[0].clientX;
+    touchActive = false;
+    longTimer = setTimeout(function() { touchActive = true; showTip(cx); }, 300);
+  }, { passive: true });
+  svgEl.addEventListener('touchmove', function(e) {
+    if (!touchActive) { clearTimeout(longTimer); return; }
+    e.preventDefault();
+    showTip(e.touches[0].clientX);
+  }, { passive: false });
+  svgEl.addEventListener('touchend', function() {
+    clearTimeout(longTimer);
+    if (touchActive) { touchActive = false; setTimeout(hideTip, 1500); }
+  });
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
