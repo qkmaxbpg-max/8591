@@ -1863,6 +1863,29 @@ function renderAds() {
     '</div>';
   });
   $('adConfigList').innerHTML = h;
+  // Render ad_spends records
+  var filteredAds = ads.filter(function(a) {
+    var d = a.ad_date || '';
+    return isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
+  });
+  if (filteredAds.length > 0) {
+    var ah = '<h4 style="margin:16px 0 8px;font-size:.95rem">單筆廣告紀錄</h4>';
+    filteredAds.forEach(function(a) {
+      ah += '<div class="card" style="margin-bottom:8px;padding:14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<strong>' + esc(a.ad_platform || '其他') + '</strong>' +
+            '<span style="color:var(--fg2);font-size:.85rem">' + (a.ad_date || '') + '</span>' +
+            (a.notes ? '<span style="color:var(--fg3);font-size:.85rem">📝 ' + esc(a.notes) + '</span>' : '') +
+          '</div>' +
+          '<b class="text-red">NT$' + fmtN(a.amount || 0) + '</b>' +
+        '</div>' +
+      '</div>';
+    });
+    $('adSpendList').innerHTML = ah;
+  } else {
+    $('adSpendList').innerHTML = '';
+  }
 }
 function toggleAdcEnd() {
   var chk = $('adc_noend');
