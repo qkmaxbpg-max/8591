@@ -289,8 +289,15 @@ function genOrderNo() {
   var seq = max + 1;
   return 'MWJ-' + String(seq).padStart(5, '0');
 }
+function adSpendCovered(a) {
+  var d = a.ad_date || '', p = a.ad_platform || '其他';
+  return adConfigs.some(function(c) {
+    if ((c.platform || '其他') !== p) return false;
+    return d >= (c.start_date || '') && d <= (c.end_date || '9999-12-31');
+  });
+}
 function monthAds(ym) {
-  var oldTotal = ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym })
+  var oldTotal = ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym && !adSpendCovered(a) })
     .reduce(function(s, a) { return s + (a.amount || 0) }, 0);
   return oldTotal + calcAdConfigCost(ym);
 }
@@ -304,9 +311,8 @@ function calcAdConfigCost(ym) {
   if (mStart > t) return 0;
   var total = 0;
   adConfigs.forEach(function(c) {
-    if (!c.active) return;
     var s = c.start_date || '';
-    var e = c.end_date || '9999-12-31';
+    var e = c.end_date || (!c.active ? t : '9999-12-31');
     if (e > t) e = t;
     if (e < mStart || s > mEnd) return;
     var effStart = s > mStart ? s : mStart;
@@ -320,9 +326,9 @@ function calcAdConfigCost(ym) {
 function calcAdConfigCostRange(startDate, endDate) {
   var total = 0;
   adConfigs.forEach(function(c) {
-    if (!c.active) return;
+    var t = today();
     var s = c.start_date || '';
-    var e = c.end_date || '9999-12-31';
+    var e = c.end_date || (!c.active ? t : '9999-12-31');
     if (e < startDate || s > endDate) return;
     var effStart = s > startDate ? s : startDate;
     var effEnd = e < endDate ? e : endDate;
@@ -556,9 +562,9 @@ function _renderDashboard() {
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
   var adTotal = isAll
-    ? ads.reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.filter(function(c){return c.active}).reduce(function(s,c){ var t=today(),sd=c.start_date||t,ed=c.end_date||t; if(ed>t)ed=t; if(sd>t)return s; return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
+    ? ads.filter(function(a){return !adSpendCovered(a)}).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.reduce(function(s,c){ var t=today(),sd=c.start_date||t,ed=c.end_date||(!c.active?t:t); if(ed>t)ed=t; if(sd>t)return s; return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
     : isYear
-      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
+      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy && !adSpendCovered(a) }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
       : monthAds(ym);
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
@@ -1771,7 +1777,7 @@ function adConfigDaysInMonth(c, ym) {
   if (mEnd > t) mEnd = t;
   if (mStart > t) return 0;
   var s = c.start_date || '';
-  var e = c.end_date || '9999-12-31';
+  var e = c.end_date || (!c.active ? t : '9999-12-31');
   if (e > t) e = t;
   if (e < mStart || s > mEnd) return 0;
   var effStart = s > mStart ? s : mStart;
@@ -1789,12 +1795,12 @@ function renderAds() {
   var platMap = {};
   var total = 0;
   adConfigs.forEach(function(c) {
-    if (!c.active) return;
     var cost = 0;
     if (isAll) {
       var t = today();
       var s = c.start_date || t;
       var e = c.end_date || t;
+      if (!c.active && !e) e = t;
       if (e > t) e = t;
       if (s > t) return;
       var d1 = new Date(s); var d2 = new Date(e);
@@ -1814,16 +1820,22 @@ function renderAds() {
       total += cost;
     }
   });
-  // Add old ad_spends records
+  // Add old ad_spends records (skip dates covered by a config on same platform)
   ads.forEach(function(a) {
     var d = a.ad_date || '';
     var match = isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
-    if (match) {
-      var p = a.ad_platform || '其他';
-      if (!platMap[p]) platMap[p] = 0;
-      platMap[p] += a.amount || 0;
-      total += a.amount || 0;
-    }
+    if (!match) return;
+    var p = a.ad_platform || '其他';
+    var covered = adConfigs.some(function(c) {
+      if ((c.platform || '其他') !== p) return false;
+      var cs = c.start_date || '';
+      var ce = c.end_date || '9999-12-31';
+      return d >= cs && d <= ce;
+    });
+    if (covered) return;
+    if (!platMap[p]) platMap[p] = 0;
+    platMap[p] += a.amount || 0;
+    total += a.amount || 0;
   });
 
   var statHtml = statCard('總廣告費', 'NT$' + fmtN(total), '', 'red');
@@ -1868,9 +1880,10 @@ function renderAds() {
     var d = a.ad_date || '';
     return isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
   });
-  if (filteredAds.length > 0) {
+  var uncovered = filteredAds.filter(function(a) { return !adSpendCovered(a) });
+  if (uncovered.length > 0) {
     var ah = '<h4 style="margin:16px 0 8px;font-size:.95rem">單筆廣告紀錄</h4>';
-    filteredAds.forEach(function(a) {
+    uncovered.forEach(function(a) {
       ah += '<div class="card" style="margin-bottom:8px;padding:14px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
           '<div style="display:flex;align-items:center;gap:12px">' +
