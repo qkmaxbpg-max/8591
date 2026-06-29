@@ -718,16 +718,16 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   '</svg>';
   var pts = points, mo = month, yr = year;
   var weekDay = ['日','一','二','三','四','五','六'];
-  el.querySelector('#rvSvg').addEventListener('mousemove', function(e) {
-    var svg = this, rect = svg.getBoundingClientRect();
-    var scaleX = W / rect.width;
-    var mx = (e.clientX - rect.left) * scaleX;
+  var svgEl = el.querySelector('#rvSvg');
+  function showTip(clientX) {
+    var rect = svgEl.getBoundingClientRect();
+    var mx = (clientX - rect.left) * (W / rect.width);
     var closest = 0, minD = 9999;
     pts.forEach(function(p, i) { var d = Math.abs(p.x - mx); if (d < minD) { minD = d; closest = i; } });
     var p = pts[closest];
-    var tip = svg.querySelector('#rvTip'), bg = svg.querySelector('#rvTipBg');
-    var dt = svg.querySelector('#rvTipDate'), vl = svg.querySelector('#rvTipVal');
-    var hl = svg.querySelector('#rvDotHL'), gl = svg.querySelector('#rvGuide');
+    var tip = svgEl.querySelector('#rvTip'), bg = svgEl.querySelector('#rvTipBg');
+    var dt = svgEl.querySelector('#rvTipDate'), vl = svgEl.querySelector('#rvTipVal');
+    var hl = svgEl.querySelector('#rvDotHL'), gl = svgEl.querySelector('#rvGuide');
     var wd = weekDay[new Date(yr, mo - 1, p.d).getDay()];
     dt.textContent = mo + '/' + p.d + '(' + wd + ')';
     vl.textContent = 'NT$' + fmtN(p.v);
@@ -743,12 +743,17 @@ function renderRevenueChart(completed, ym, isAll, isYear, yy) {
     tip.style.display = ''; hl.style.display = ''; gl.style.display = '';
     hl.setAttribute('cx', p.x); hl.setAttribute('cy', p.y);
     gl.setAttribute('x1', p.x); gl.setAttribute('y1', padT); gl.setAttribute('x2', p.x); gl.setAttribute('y2', padT + cH);
-  });
-  el.querySelector('#rvSvg').addEventListener('mouseleave', function() {
-    this.querySelector('#rvTip').style.display = 'none';
-    this.querySelector('#rvDotHL').style.display = 'none';
-    this.querySelector('#rvGuide').style.display = 'none';
-  });
+  }
+  function hideTip() {
+    svgEl.querySelector('#rvTip').style.display = 'none';
+    svgEl.querySelector('#rvDotHL').style.display = 'none';
+    svgEl.querySelector('#rvGuide').style.display = 'none';
+  }
+  svgEl.addEventListener('mousemove', function(e) { showTip(e.clientX); });
+  svgEl.addEventListener('mouseleave', hideTip);
+  svgEl.addEventListener('touchstart', function(e) { e.preventDefault(); showTip(e.touches[0].clientX); }, { passive: false });
+  svgEl.addEventListener('touchmove', function(e) { e.preventDefault(); showTip(e.touches[0].clientX); }, { passive: false });
+  svgEl.addEventListener('touchend', function() { setTimeout(hideTip, 2000); });
 }
 function statCard(label, value, sub, cls) {
   return '<div class="stat-card ' + (cls || '') + '"><div class="label">' + label + '</div><div class="value">' + value + '</div>' +
