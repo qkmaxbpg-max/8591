@@ -2,18 +2,20 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://hpajiexvcmkidbgreaqy.supabase.co wss://hpajiexvcmkidbgreaqy.supabase.co; worker-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="貓玩聚">
 <meta name="theme-color" content="#ff6b00">
-<title>貓玩聚代儲</title>
+<title>貓玩聚代儲｜營運管理</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="style.css?v=64">
+<link rel="stylesheet" href="style.css?v=787ccbc4d503">
 </head>
 <body>
+
 
 <!-- Toast -->
 <div id="toast" class="toast"></div>
@@ -32,25 +34,28 @@
       <input id="loginPw" type="password" placeholder="密碼">
     </div>
     <button id="btnLogin" class="btn primary full" onclick="doLogin()">登入</button>
-    <button class="btn ghost full" onclick="doSignup()" style="margin-top:8px">註冊新帳號</button>
+    
     <div class="form-group" style="margin-top:16px">
-      <button class="btn ghost full" onclick="enterDemo()">先試用（本機模式）</button>
+      
     </div>
   </div>
 </div>
 
 <!-- Main App -->
 <div id="app" class="page" style="display:none">
+<div id="dataLoadError" class="data-load-error" hidden><h3>資料尚未完整載入</h3><p>為避免漏單或覆蓋舊資料，操作已暫停。請確認網路後重新整理。</p><button class="btn primary" onclick="location.reload()">重新整理</button></div>
 
   <div id="stickyHeader">
   <!-- Top Bar -->
   <header id="topBar">
     <div class="top-left">
+      <button class="icon-btn" onclick="toggleWorkspaceDrawer()" aria-label="開啟工作區選單">☰</button><span id="workspaceLabel" class="order-sub">營運管理</span>
       <span id="appLogoWrap"><img src="icon.png" class="logo-img" alt="logo"></span>
       <span id="appTitle" class="app-title">貓玩聚</span>
       <div id="storeSwitcher" class="store-switcher" style="display:none"></div>
     </div>
     <div class="top-right">
+      <button class="btn sm ghost" onclick="openQuickNotes()">快速記事</button>
       <button class="icon-btn" onclick="doRefresh()" title="重新整理">⟳</button>
       <button class="icon-btn" onclick="toggleTheme()" title="切換主題">◐</button>
       <button class="icon-btn" onclick="openSettings()" title="設定">⚙</button>
@@ -58,6 +63,7 @@
     </div>
   </header>
 
+  <div id="workspaceDrawer" class="workspace-drawer" hidden><strong>工作區</strong><button class="btn ghost" onclick="setWorkspace('operations')">營運管理</button><button class="btn ghost" onclick="setWorkspace('finance')">財務管理</button><button class="btn ghost" onclick="toggleWorkspaceDrawer();openSettings()">系統設定</button></div>
   <!-- Tab Navigation -->
   <nav id="tabBar">
     <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">總覽</button>
@@ -67,20 +73,49 @@
     <button class="tab" data-tab="agents" onclick="switchTab('agents')">出單人</button>
     <button class="tab" data-tab="customers" onclick="switchTab('customers')">客戶</button>
     <button class="tab" data-tab="ads" onclick="switchTab('ads')">廣告</button>
+<button class="tab" data-workspace="finance" data-tab="financeOverview" onclick="switchTab('financeOverview');renderFinanceReports()" hidden>財務總覽</button>
+<button class="tab" data-workspace="finance" data-tab="financeDaily" onclick="switchTab('financeDaily')" hidden>日常記帳</button>
+    <button class="tab" data-workspace="finance-detail" data-tab="procurement" onclick="switchTab('procurement');renderProcurement()" hidden>採購帳本</button>
+    <button class="tab" data-workspace="finance" data-tab="suppliers" onclick="switchTab('suppliers');renderProcurement()" hidden>財務設定</button>
+<button class="tab" data-workspace="finance" data-tab="financeAccounts" onclick="switchTab('financeAccounts');renderFinanceAccounts()" hidden>帳戶與信用卡</button>
+
+<button class="tab" data-workspace="finance-detail" data-tab="cashLedger" onclick="switchTab('cashLedger');renderFinanceLedger()" hidden>收支帳本</button>
+<button class="tab" data-workspace="finance-detail" data-tab="platformMonths" onclick="switchTab('platformMonths');renderFinanceLedger()" hidden>平台月結</button>
+<button class="tab" data-workspace="finance-detail" data-tab="afterSales" onclick="switchTab('afterSales');renderFinanceLedger()" hidden>退款與售後</button>
   </nav>
   </div>
 
   <!-- Subscription Expiry Alert Bar -->
   <div id="expiryAlertBar" class="expiry-alert-bar" style="display:none"></div>
 
+  <section id="tab-financeDaily" class="tab-content">
+    <div class="finance-page-heading"><h2>今天要記哪一筆？</h2><p class="hint">選擇事情，再填金額。儲存就是完成記錄，不需要再逐筆確認。</p></div>
+    <div class="finance-action-grid">
+      <button class="card finance-action" onclick="openProcurement()"><strong>向廠商叫貨</strong><span>記錄商品採購金額，選擇付款、刷卡或預付款抵扣。</span></button>
+      <button class="card finance-action" onclick="openLedgerEntry('expense')"><strong>記其他支出／收款</strong><span>廣告、系統費等額外支出；商品採購請使用叫貨。</span></button>
+      <button class="card finance-action" onclick="openPlatformMonth()"><strong>平台撥款入帳</strong><span>蝦皮或 8591 每月彙總，填寫實收與實際手續費。</span></button>
+      <button class="card finance-action" onclick="openSupplierPayment()"><strong>付廠商款／儲值</strong><span>結清叫貨款，或先存錢給廠商供日後扣抵；不是再記一次成本。</span></button>
+    </div>
+    <div class="card finance-section"><h3>查看已登記的紀錄</h3><button class="btn ghost" onclick="openFinanceHistory()">入帳歷程／更正錯帳</button><div class="act-group"><button class="btn ghost" onclick="financeHistory('procurement')">叫貨紀錄</button><button class="btn ghost" onclick="financeHistory('cashLedger')">其他收支</button><button class="btn ghost" onclick="financeHistory('platformMonths')">平台撥款</button><button class="btn ghost" onclick="financeHistory('suppliers')">廠商付款與預付款</button><button class="btn ghost" onclick="financeHistory('afterSales')">退款與售後</button></div></div>
+    <p class="hint">第一次使用？先到「財務設定」建立廠商，再到「帳戶與信用卡」填入帳戶與期初金額。此處只登記，不會執行真實付款。</p>
+  </section>
+  <section id="tab-procurement" class="tab-content"><div class="finance-page-heading"><button class="btn sm ghost" onclick="switchTab('financeDaily')">← 返回日常記帳</button><h2>叫貨紀錄</h2></div>
+    <div class="toolbar"><div class="toolbar-top"><button class="btn primary" onclick="openProcurement()">＋ 新增採購</button><div class="search-box"><input id="procurementSearch" placeholder="搜尋叫貨摘要、貨源、備註…" oninput="renderProcurement()"></div></div><div class="form-group"><label>貨源篩選</label><select id="procurementSupplierFilter" onchange="renderProcurement()"></select><div id="procurementSupplierFilterDrop"></div></div></div>
+    <p class="hint">財務管理｜只記錄帳目，不執行付款。期初、平台月結、卡款、售後與管理試算可從財務分頁操作，非正式會計系統。請先設定財務起算日及各帳戶期初。</p><div id="procurementStats" class="stat-cards"></div><div id="procurementList"></div>
+  </section>
+  <section id="tab-suppliers" class="tab-content"><div class="finance-page-heading"><h2>財務設定</h2><button class="btn ghost" onclick="openFinanceStart()">設定財務起算日</button><p class="hint">管理廠商與貨源。銀行帳戶、信用卡與期初金額請到「帳戶與信用卡」設定；商品的預設貨源在商品編輯中設定。</p></div><div class="toolbar"><div class="act-group"><button class="btn primary" onclick="openSupplierEditor()">＋ 新增貨源</button><button class="btn ghost" onclick="openSupplierPayment()">登記付款／預付款</button></div></div><p class="hint">三家廠商、淘寶及官方平台共用同一份貨源資料。採購成本、付款與預付款抵扣分開，不重複計算。</p><div id="supplierList" class="supplier-grid"></div><div id="supplierPaymentHistory"></div></section>
+
+  <section id="tab-financeAccounts" class="tab-content"><div class="toolbar"><div class="act-group"><button class="btn primary" onclick="openFinanceAccount()">＋ 新增帳戶／信用卡</button><button class="btn ghost" onclick="openFinanceTransfer()">記錄轉帳／實際繳卡費</button></div></div><p class="hint">依已登記營業金流計算，不連銀行。先設定期初；預設起算日 2026/11/1，可在首次建檔時調整。只反映你已登記的採購、收支、平台月結與轉帳；仍須與銀行及帳單核對。</p><div id="financeAccounts" class="supplier-grid"></div><div id="financeCardPayments" class="finance-section"></div><div id="financeTransferHistory" class="finance-section"></div></section>
+<section id="tab-financeOverview" class="tab-content"><div class="toolbar"><div class="finance-range form-group"><label>報表區間</label><div class="act-group"><input id="financeReportStart" aria-label="開始日期" type="date" onchange="renderFinanceReports()"><span>至</span><input id="financeReportEnd" aria-label="結束日期" type="date" onchange="renderFinanceReports()"><button class="btn ghost" onclick="financeReportPeriod('month')">本月</button><button class="btn ghost" onclick="financeReportPeriod('year')">本年</button></div></div><div class="act-group"><button class="btn ghost" onclick="exportFinanceReport()">匯出 Excel 可開啟的 CSV</button><button class="btn ghost" onclick="exportFinanceBackup()">匯出財務資料</button></div></div><p class="hint">營運管理試算｜這裡顯示目前已登記資料，不代表完整營業帳。訂閱收入按服務期間分攤，與客戶付款當日的收款金額不同。</p><h3 class="finance-block-title">經營成果 <small>依服務期間分攤的管理試算</small></h3><div id="financeReportStats" class="finance-metrics"></div><details class="finance-section"><summary>計算方式與待確認事項</summary><div id="financeReportWarnings" class="finance-section"></div></details><h3 class="finance-block-title">資金狀況 <small>只反映已登記的實際收付款</small></h3><div id="financeCashStats" class="stat-cards"></div><div id="financeTrend" class="card finance-chart"></div><div id="financeRankings" class="finance-section"></div><details class="finance-section" open><summary>報表明細</summary><div id="financeReportDetails" class="finance-section"></div></details></section>
+<section id="tab-cashLedger" class="tab-content"><div class="finance-page-heading"><button class="btn sm ghost" onclick="switchTab('financeDaily')">← 返回日常記帳</button><h2>其他收支紀錄</h2></div><div class="toolbar"><div class="act-group"><button class="btn primary" onclick="openLedgerEntry('expense')">＋ 支出／收款</button><button class="btn ghost" onclick="exportFinanceBackup()">匯出財務資料</button></div></div><p class="hint">儲存即確認，不再二次勾選。商品成本用採購帳本；平台撥款用月結。業主投入、提領與銀行轉帳不算營業收入或費用。</p><div id="ledgerEntries"></div></section>
+<section id="tab-platformMonths" class="tab-content"><div class="finance-page-heading"><button class="btn sm ghost" onclick="switchTab('financeDaily')">← 返回日常記帳</button><h2>平台撥款紀錄</h2></div><div class="toolbar"><button class="btn primary" onclick="openPlatformMonth()">＋ 每月彙總一次</button></div><p class="hint">成交額不是銀行收款；平台實際撥款會自動加入收支帳本，不要再登記一次。期初從上月銜接；差異保留待查，不自動補費用。</p><div id="platformMonthsList"></div></section>
+<section id="tab-afterSales" class="tab-content"><div class="finance-page-heading"><button class="btn sm ghost" onclick="switchTab('financeDaily')">← 返回日常記帳</button><h2>退款與售後</h2></div><div class="toolbar"><div class="act-group"><button class="btn primary" onclick="openAfterSale()">＋ 售後／退款案件</button><button class="btn ghost" onclick="openSupplierCompensation()">登記已收到廠商補償</button></div></div><p class="hint">換帳號、補天數、退款分別記錄；退款金額手動輸入。登記案件不等於已轉帳，原訂單及座位日期不會被自動改寫。</p><div id="afterSalesList"></div></section>
+
   <!-- Dashboard -->
   <section id="tab-dashboard" class="tab-content active">
+    <p id="adAccountingNotice" class="hint"></p>
     <div id="mpDash" class="month-picker-bar" data-target="dash"></div>
     <div class="stat-cards" id="statCards"></div>
-    <div class="card" id="dashCycleCard" style="display:none">
-      <div class="card-head"><h3>🔄 換家庭提醒</h3><button class="btn sm ghost" onclick="switchTab('subs')">查看全部 →</button></div>
-      <div id="dashCycle"></div>
-    </div>
     <div class="card">
       <div class="card-head"><h3>📈 每日淨利</h3></div>
       <div id="revenueChart"></div>
@@ -126,6 +161,7 @@
       <select id="orderStatusFilter" style="display:none"><option value=""></option></select>
     </div>
     <div id="mpOrders" class="month-picker-bar" data-target="orders"></div>
+    <p id="orderResults" class="hint order-results"></p>
     <div id="orderList" class="table-wrap"></div>
   </section>
 
@@ -133,10 +169,11 @@
   <section id="tab-products" class="tab-content">
     <div class="toolbar">
       <div class="toolbar-top">
-        <button class="btn primary" onclick="openProductModal()">＋ 新增商品</button>
+        <button class="btn primary" onclick="openProductBatch()">＋ 新增商品與方案</button>
         <div class="search-box"><input id="prodSearch" type="text" placeholder="搜尋商品..." oninput="renderProducts()"></div>
       </div>
     </div>
+<div class="category-filter-bar form-group"><label for="productCategoryFilter">商品分類</label><div class="category-filter-controls"><select id="productCategoryFilter" data-category-select="filter" onchange="categoryFilterChanged(this)"><option value="all">全部分類</option></select><button class="btn ghost" onclick="openCategoryManager()" aria-label="管理商品分類">⚙ 管理分類</button></div></div>
     <div id="productList"></div>
   </section>
 
@@ -169,14 +206,15 @@
         <span class="filter-tag active" data-value="active" onclick="setFilter(this,'subsFilter')">進行中</span>
         <span class="filter-tag" data-value="expiring" onclick="setFilter(this,'subsFilter')">即將到期</span>
         <span class="filter-tag" data-value="renewal" onclick="setFilter(this,'subsFilter')">已續約</span>
-        <span class="filter-tag" data-value="cycle" onclick="setFilter(this,'subsFilter')">換家庭<span id="cycleBadge" class="filter-badge" style="display:none"></span></span>
         <span class="filter-tag" data-value="expired" onclick="setFilter(this,'subsFilter')">已過期</span>
         <span class="filter-tag" data-value="all" onclick="setFilter(this,'subsFilter')">全部</span>
       </div>
       <select id="subsFilter" style="display:none"><option value="active"></option></select>
     </div>
+<div class="category-filter-bar form-group"><label for="subscriptionCategoryFilter">商品分類</label><div class="category-filter-controls"><select id="subscriptionCategoryFilter" data-category-select="filter" onchange="categoryFilterChanged(this)"><option value="all">全部分類</option></select><button class="btn ghost" onclick="openCategoryManager()" aria-label="管理商品分類">⚙ 管理分類</button></div></div>
     <div class="subs-summary" id="subsSummary"></div>
     <div id="subsNav" class="subs-nav"></div>
+    <div id="subsRenewalHistory"></div>
     <div id="subsList" class="subs-grid"></div>
   </section>
 
@@ -196,6 +234,43 @@
 <!-- Modal backdrop -->
 <div id="modalBg" class="modal-bg" onclick="closeModal()"></div>
 
+<div id="orderDetailModal" class="modal order-detail-modal">
+  <div class="modal-head"><h3 id="orderDetailTitle">訂單詳情</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
+  <div id="orderDetailBody" class="modal-body"></div>
+  <div id="orderDetailActions" class="modal-foot"><button class="btn ghost" onclick="closeModal()">關閉</button></div>
+</div>
+
+<div id="productDetailModal" class="modal order-detail-modal">
+  <div class="modal-head"><h3 id="productDetailTitle">商品詳情</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
+  <div id="productDetailBody" class="modal-body"></div>
+  <div id="productDetailActions" class="modal-foot"></div>
+</div>
+
+<div id="categoryManagerModal" class="modal order-detail-modal">
+  <div class="modal-head"><h3>商品分類管理</h3><button class="close-btn" onclick="closeCategoryManager()">&times;</button></div>
+  <div class="modal-body"><p class="hint">共用分類設定，儲存後同步至各頁；有商品使用的分類需先移轉再停用。</p><div class="form-group"><label for="categoryNewName">新增分類</label><div class="category-filter-controls"><input id="categoryNewName" placeholder="分類名稱"><button class="btn primary" onclick="categoryOperation('add')">新增</button></div></div><div id="categoryManagerList" class="form-group"></div><h4>商品分類指派</h4><div id="categoryAssignments" class="category-assignments form-group"></div></div>
+  <div class="modal-foot"><button class="btn primary" onclick="closeCategoryManager()">完成並返回</button></div>
+</div>
+
+<div id="procurementModal" class="modal order-detail-modal"><div class="modal-head"><h3 id="procurementModalTitle">採購</h3><button class="close-btn" onclick="closeModal()">&times;</button></div><div id="procurementForm" class="modal-body"></div><div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button id="procurementSave" class="btn primary">儲存紀錄</button></div></div>
+
+<!-- Batch product options -->
+<div id="productBatchModal" class="modal product-batch-modal">
+  <div class="modal-head"><h3>新增商品與多個方案</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
+  <div class="modal-body">
+<div class="form-group"><label for="pb_category">商品分類（所有方案共用）</label><div class="category-filter-controls"><select id="pb_category" data-category-select="assign"><option value="">未分類</option></select><button class="btn ghost" onclick="openCategoryManager()">＋ 新增／管理分類</button></div></div>
+<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pb_source"></select><div id="pb_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶</label><select id="pb_payAccount"></select><div id="pb_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pb_purchaseMode"></select><div id="pb_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
+    <div class="form-group"><label for="pb_platform">商品名稱</label><input id="pb_platform" list="platformList" placeholder="例如 YouTube Premium"></div>
+    <div class="form-row"><div class="form-group"><label for="pb_info">共同提供資料</label><input id="pb_info" placeholder="例如電子信箱"></div><div class="form-group"><label for="pb_notes">共同備註</label><input id="pb_notes" placeholder="可在個別方案覆寫"></div></div>
+    <p class="hint">每列是一個方案。期間可輸入天、週、月、年或自訂文字；自訂文字不自動計算訂單到期日。</p>
+    <div class="product-duration-presets"><span>快速加入期間：</span><button class="btn sm ghost" onclick="addProductOption('1個月')">＋1個月</button><button class="btn sm ghost" onclick="addProductOption('3個月')">＋3個月</button><button class="btn sm ghost" onclick="addProductOption('6個月')">＋6個月</button><button class="btn sm ghost" onclick="addProductOption('12個月')">＋12個月</button></div>
+    <datalist id="productDurationChoices"><option value="3天"><option value="7天"><option value="14天"><option value="2週"><option value="1個月"><option value="3個月"><option value="6個月"><option value="12個月"><option value="1年"><option value="單次"><option value="永久"></datalist>
+    <div class="table-scroll"><table class="product-option-editor"><thead><tr><th>方案名稱</th><th>期間</th><th>成本</th><th>8591售價</th><th>蝦皮售價</th><th>狀態</th><th>個別備註</th><th></th></tr></thead><tbody id="pb_rows"></tbody></table></div>
+    <button type="button" class="btn ghost" onclick="addProductOption()" style="margin-top:12px">＋ 加一列方案</button>
+  </div>
+  <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button id="pb_save" class="btn primary" onclick="saveProductOptions()">一次儲存全部方案</button></div>
+</div>
+
 <!-- Product Modal -->
 <div id="productModal" class="modal">
   <div class="modal-head">
@@ -203,13 +278,15 @@
     <button class="close-btn" onclick="closeModal()">&times;</button>
   </div>
   <div class="modal-body">
+<div class="form-group"><label for="pm_category">商品分類（所有方案共用）</label><div class="category-filter-controls"><select id="pm_category" data-category-select="assign"><option value="">未分類</option></select><button class="btn ghost" onclick="openCategoryManager()">＋ 新增／管理分類</button></div></div>
+<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pm_source"></select><div id="pm_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶</label><select id="pm_payAccount"></select><div id="pm_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pm_purchaseMode"></select><div id="pm_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
     <input id="pm_id" type="hidden">
     <div class="form-row">
       <div class="form-group"><label>平台/商品</label><input id="pm_platform" list="platformList" placeholder="YouTube Premium"><datalist id="platformList"></datalist></div>
-      <div class="form-group"><label>版本/類型</label><input id="pm_version" placeholder="家庭版"></div>
+      <div class="form-group"><label>方案名稱/類型</label><input id="pm_version" placeholder="家庭版"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>使用期間</label><input id="pm_duration" list="durationList" placeholder="1個月"><datalist id="durationList"><option value="1個月"><option value="3個月"><option value="6個月"><option value="12個月"></datalist></div>
+      <div class="form-group"><label>使用期間</label><input id="pm_duration" list="durationList" placeholder="例如 7天、2週、3個月、單次"><datalist id="durationList"><option value="3天"><option value="7天"><option value="14天"><option value="1個月"><option value="3個月"><option value="6個月"><option value="12個月"><option value="單次"><option value="永久"></datalist></div>
       <div class="form-group"><label>狀態</label><select id="pm_status"><option>啟用</option><option>停用</option></select></div>
     </div>
     <div class="form-row">
@@ -246,8 +323,12 @@
       <div class="form-group"><label>出單人</label><div id="om_agentDrop"></div><input id="om_agent" type="hidden"></div>
       <div class="form-group"><label>客戶</label><div id="om_customerDrop"></div><input id="om_customer" type="hidden"></div>
     </div>
+    <div class="form-group"><label for="om_productMode">商品來源</label><select id="om_productMode" onchange="changeOrderProductMode()"><option value="catalog">已建檔商品</option><option value="temporary">臨時商品</option></select><p class="hint">與銷售管道分開；臨時商品不會自動加入商品管理。</p></div>
     <div class="form-group" id="om_productGroup">
-      <label>選擇商品</label>
+      <label>商品</label>
+<select id="orderCategoryFilter" data-category-select="filter" aria-label="商品分類" onchange="changeOrderCategory()"><option value="all">全部分類</option></select>
+      <div id="om_platformDrop"></div>
+      <label style="margin-top:8px">方案與期間</label>
       <div id="om_productDrop"></div><input id="om_product" type="hidden">
     </div>
     <div id="om_seatGroup" style="display:none">
@@ -258,8 +339,12 @@
     </div>
     <div id="om_manualGroup" style="display:none">
       <div class="form-group">
-        <label>商品名稱</label>
+        <label>臨時商品名稱</label>
         <div id="om_personalDrop"></div><input id="om_manualName" type="hidden">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="om_manualVersion">方案名稱（選填）</label><input id="om_manualVersion" placeholder="例如個人版、代儲方案"></div>
+        <div class="form-group"><label for="om_manualDuration">期間（選填）</label><input id="om_manualDuration" list="productDurationChoices" placeholder="例如7天、1個月、單次"><button type="button" class="btn sm ghost" onclick="setProductExpiry(dpGetVal('om_startDate') || dpGetVal('om_date'), $('om_manualDuration').value)">依期間帶入到期日</button></div>
       </div>
     </div>
     <div class="form-row">
@@ -316,8 +401,8 @@
   <div class="modal-body">
     <input id="cm_id" type="hidden">
     <div class="form-group"><label>名稱</label><input id="cm_name" placeholder="客戶名稱"></div>
-    <div class="form-group"><label>聯絡方式</label><input id="cm_contact" placeholder="Line ID / Discord"></div>
-    <div class="form-group"><label>來源平台</label><input id="cm_platform" placeholder="蝦皮 / Dcard / 朋友介紹"></div>
+    <div class="form-group"><label>聯絡方式</label><input id="cm_contact" placeholder="平台帳號／LINE ID／其他聯絡方式"></div>
+    <div class="form-group"><label>來源平台</label><div id="cm_platformDrop"></div><input id="cm_platform" type="hidden"><p class="hint">記錄這位客戶的來源，與每筆訂單的銷售管道分開；可搜尋或新增其他來源。</p></div>
     <div class="form-group"><label>備註</label><input id="cm_notes" placeholder=""></div>
   </div>
   <div class="modal-foot">
@@ -360,26 +445,10 @@
 
 <!-- Settings Modal -->
 <div id="settingsModal" class="modal modal-lg">
-  <div class="modal-head">
-    <h3>設定</h3>
-    <button class="close-btn" onclick="closeModal()">&times;</button>
-  </div>
-  <div class="modal-body">
-    <div class="form-group">
-      <label>截圖辨識模式</label>
-      <select id="set_ocrMode">
-        <option value="free">免費（Tesseract OCR）</option>
-        <option value="ai">高精度（Claude AI，需 API Key）</option>
-      </select>
-      <p class="hint">免費模式完全離線處理，高精度模式辨識更準確</p>
-    </div>
-    <div class="form-group" id="apiKeyGroup" style="display:none">
-      <label>Anthropic API Key</label>
-      <input id="set_apiKey" type="password" placeholder="sk-ant-...">
-      <p class="hint">到 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> 取得</p>
-    </div>
-    <hr style="border:none;border-top:1px solid var(--bg4);margin:16px 0">
-    <h4 style="margin-bottom:12px">訂單預設值</h4>
+ <div class="modal-head"><h3>系統設定</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
+ <div class="modal-body settings-layout"><nav class="settings-nav" aria-label="設定分類">
+<button class="btn ghost" data-setting-tab="orders" onclick="showSettingsPanel('orders')">訂單預設</button><button class="btn ghost" data-setting-tab="catalog" onclick="showSettingsPanel('catalog')">商品與貨源</button><button class="btn ghost" data-setting-tab="display" onclick="showSettingsPanel('display')">畫面偏好</button><button class="btn ghost" data-setting-tab="finance" onclick="showSettingsPanel('finance')">財務設定</button><button class="btn ghost" data-setting-tab="backup" onclick="showSettingsPanel('backup')">資料與備份</button></nav><div class="settings-content">
+<section data-setting-panel="orders">    <h4 style="margin-bottom:12px">訂單預設值</h4>
     <p class="hint" style="margin-bottom:12px">新增訂單時自動帶入的預設欄位</p>
     <div class="form-row">
       <div class="form-group"><label>預設出單人</label><div id="set_defaultAgentDrop"></div><input id="set_defaultAgent" type="hidden"></div>
@@ -389,17 +458,16 @@
       <div class="form-group"><label>預設狀態</label><div id="set_defaultStatusDrop"></div><input id="set_defaultStatus" type="hidden"></div>
       <div class="form-group"></div>
     </div>
-    <hr style="border:none;border-top:1px solid var(--bg4);margin:16px 0">
-    <h4 style="margin-bottom:12px">帳號管理（座位追蹤）</h4>
+<details><summary>共用帳號與座位管理</summary>    <h4 style="margin-bottom:12px">帳號管理（座位追蹤）</h4>
     <p class="hint" style="margin-bottom:12px">管理 Netflix、Spotify 等多人共用帳號，追蹤每個座位的使用狀態</p>
     <button class="btn primary sm" onclick="openSvcAccountModal()" style="margin-bottom:12px">＋ 新增帳號</button>
     <div id="svcAccountList"></div>
-  </div>
-  <div class="modal-foot">
-    <button class="btn ghost" onclick="closeModal()">取消</button>
-    <button class="btn primary" onclick="saveSettings()">儲存</button>
-  </div>
-</div>
+</details></section>
+<section data-setting-panel="catalog" hidden><h4>商品與貨源</h4><p class="hint">所有入口共用相同資料。管理清單的修改即時儲存；下方「儲存偏好」不負責撤銷清單修改。</p><div class="settings-links"><button class="btn ghost" onclick="openCategoryManager()">管理商品分類</button><button class="btn ghost" onclick="settingsGo('suppliers')">管理廠商與貨源 →</button><button class="btn ghost" onclick="settingsGo('products')">商品、方案與預設成本 →</button></div><p class="hint">各商品的期間、價格、預設貨源與採購方式在商品內編輯。既有訂單保留當時的成交資料。</p><p class="hint">常用期間：1、3、6、12 個月；新增方案仍可自由輸入天、週、月、年。</p></section>
+<section data-setting-panel="display" hidden><h4>畫面偏好</h4><div class="form-group"><label>開啟系統時的首頁</label><div id="set_homeDrop"></div><input id="set_home" type="hidden"></div><div class="form-group"><label>表格間距</label><div id="set_densityDrop"></div><input id="set_density" type="hidden"></div><div class="form-group"><label>快速記事預設顯示</label><div id="set_notesDrop"></div><input id="set_notes" type="hidden"></div><p class="hint">偏好僅儲存在目前裝置的預覽。首頁在下次開啟時生效；間距儲存後立即套用。</p></section>
+<section data-setting-panel="finance" hidden><h4>財務設定</h4><p class="hint">沿用財務管理的同一份帳戶、廠商及費用資料。</p><div class="settings-links"><button class="btn ghost" onclick="settingsGo('financeAccounts')">銀行、信用卡與期初設定 →</button><button class="btn ghost" onclick="settingsGo('suppliers')">廠商與預付款 →</button><button class="btn ghost" onclick="settingsGo('financeDaily')">日常收支與平台撥款 →</button></div><p class="hint">財務起算日及期初已有交易後受保護，請在帳戶頁查看可調整項目。正式資料銜接與收入認列規則尚未完成，不提供任意改寫歷史的開關。</p></section>
+<section data-setting-panel="backup" hidden><h4>資料與備份</h4><p class="hint">訂單、商品、記事及財務存於資料庫。顯示偏好留在此裝置；匯出檔請存放於私人位置。</p><button class="btn ghost" onclick="exportFinanceBackup()">匯出財務資料</button><p class="hint">此按鈕只備份現有財務模組資料，不包含完整訂單、商品或快速記事，也不是 Supabase 正式資料庫備份。</p><p class="hint">完整資料庫備份由維護流程另行建立；此頁不提供清空或一鍵覆蓋還原。</p></section>
+</div></div><div class="modal-foot"><span class="hint">前往管理頁會離開設定；未儲存的偏好不會套用。</span><button class="btn ghost" onclick="closeModal()">關閉</button><button class="btn primary" onclick="saveSettings()">儲存偏好</button></div></div>
 
 <!-- Service Account Modal -->
 <div id="svcAccountModal" class="modal modal-sm">
@@ -430,33 +498,11 @@
     <button class="close-btn" onclick="closeModal()">&times;</button>
   </div>
   <div class="modal-body">
-    <div class="import-tabs">
-      <button class="import-tab active" onclick="switchImportTab('paste')">📋 貼上文字</button>
-      <button class="import-tab" onclick="switchImportTab('screenshot')">📷 截圖辨識</button>
-    </div>
-
     <!-- Paste Tab -->
     <div id="importTab-paste" class="import-tab-content active">
-      <p class="import-hint">在 8591 訂單頁面<strong>選取訂單文字</strong> → 複製 → 貼到下方，100% 準確</p>
+      <p class="import-hint">在 8591 訂單頁面<strong>選取訂單文字</strong> → 複製 → 貼到下方，解析後請核對內容</p>
       <textarea id="pasteArea" rows="8" placeholder="在 8591 頁面選取訂單區域的文字，Ctrl+C 複製後，在這裡 Ctrl+V 貼上..."></textarea>
       <button class="btn primary full" onclick="parsePastedText()" style="margin-top:8px">解析訂單</button>
-    </div>
-
-    <!-- Screenshot Tab -->
-    <div id="importTab-screenshot" class="import-tab-content">
-      <div id="ocrUploadArea" class="ocr-upload">
-        <div class="ocr-placeholder" id="ocrPlaceholder">
-          <div class="icon">📷</div>
-          <p>Ctrl+V 貼上截圖、拖拽、或點擊上傳</p>
-          <p class="sub">截圖後直接 Ctrl+V 最快！支援多筆訂單</p>
-          <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="onOcrFileSelect(event)">
-        </div>
-        <img id="ocrPreviewImg" class="ocr-preview-img" style="display:none">
-      </div>
-      <div id="ocrStatus" style="display:none" class="ocr-status">
-        <div class="spinner"></div>
-        <span>辨識中...</span>
-      </div>
     </div>
 
     <!-- Results (shared) -->
@@ -473,8 +519,35 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="app.js?v=105"></script>
+
+<script src="vendor/supabase.min.js?v=36d1ad9948fd"></script>
+<script src="runtime-config.js?v=519d0d7ab228"></script>
+<script src="product-options.js?v=8b54d1bcaaa1"></script>
+<script src="order-ui.js?v=20fc63982e60"></script>
+<script src="ad-periods.js?v=2170221b81fc"></script>
+<script src="seat-management.js?v=497a406f63dd"></script>
+<script src="product-categories.js?v=bedf23f18e48"></script>
+<script src="procurement.js?v=3a77441e0fb7"></script>
+<script src="finance-accounts.js?v=593e6accf9f3"></script>
+<script src="finance-ledger.js?v=98624134ae72"></script>
+<script src="finance-reports.js?v=397af1b177c4"></script>
+<script src="quick-notes.js?v=9dd8d05cb46d"></script>
+<div id="quickNotesModal" class="modal order-detail-modal">
+  <div class="modal-head"><h3>快速記事</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
+  <div class="modal-body">
+    <p class="hint">先記日期與商品，有空再處理。標為已處理只做記號，不會建立訂單或計入財務。</p>
+    <input id="qn_edit" type="hidden">
+    <div class="form-row"><div class="form-group"><label for="qn_date">日期</label><input id="qn_date" type="date"></div><div class="form-group"><label for="qn_product">商品</label><div id="qn_productDrop"></div></div></div>
+    <button id="qn_save" class="btn primary" onclick="saveQuickNote()">記下來</button>
+    <div id="qn_filters" class="act-group" style="margin:24px 0 12px"></div><div id="qn_list"></div>
+    <p id="qn_storageHint" class="hint">記事僅保存在此裝置的離線預覽，清除瀏覽資料可能遺失；不跨裝置同步。</p>
+  </div><div class="modal-foot"><button class="btn ghost" onclick="closeModal()">關閉</button></div>
+</div>
+<script src="quick-notes-repository.js?v=2a5023157d0d"></script>
+<script src="app.js?v=ef28898adfaf"></script>
+<script src="quick-notes-db-ui.js?v=e2a35d536cf3"></script>
+<script src="phase1-integration.js?v=82f1f0cb59a4"></script>
+<script src="finance-persistence.js?v=571dcadfb932"></script>
+<script src="operations-persistence.js?v=897336dfe355"></script>
 </body>
 </html>

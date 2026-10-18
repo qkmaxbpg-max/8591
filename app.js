@@ -1,5 +1,7 @@
+/* Production candidate: explicit origin, public anon key, RLS required. */
+if (!window.LOCAL_TEST_CONFIG || !window.LOCAL_TEST_CONFIG.supabaseUrl || !(window.LOCAL_TEST_CONFIG.environment==='production'&&location.origin===window.LOCAL_TEST_CONFIG.siteOrigin)) { throw new Error('正式環境設定不符，已停止載入'); }
 /* 代儲管理系統 */
-var SUPABASE_URL='https://hpajiexvcmkidbgreaqy.supabase.co';
+var SUPABASE_URL=window.LOCAL_TEST_CONFIG.supabaseUrl;
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwYWppZXh2Y21raWRiZ3JlYXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTY2NTQsImV4cCI6MjA5NDU5MjY1NH0.ZIxx-cJRHxLAv-TlPpjvFGBndzs-GE9ptZENh81AQQQ';
 var PLATFORM_FEE = 0.03; // 8591 fixed 3%
 var SHOPEE_FEE = 0.15; // 蝦皮預設 15%
@@ -40,7 +42,7 @@ function removePersonalPreset(name) {
 function $(id) { return document.getElementById(id) }
 function fmtN(n) { return Number(n || 0).toLocaleString('zh-TW', { maximumFractionDigits: 0 }) }
 function fmtP(n) { return (Number(n || 0) * 100).toFixed(1) + '%' }
-function today() { return new Date().toISOString().slice(0, 10) }
+function today() { return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) }
 
 /* Toast */
 function toast(msg, type) {
@@ -64,10 +66,12 @@ function toggleTheme() {
 
 /* ──── Auth ──── */
 function initSb() {
+  if (window.LOCAL_TEST_CONFIG.demoOnly) throw new Error('Database connections are disabled in the local UI preview');
   if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   return sb;
 }
 function doLogin() {
+  if (window.LOCAL_TEST_CONFIG.demoOnly) { enterDemo(); return; }
   var email = $('loginEmail').value.trim(), pw = $('loginPw').value;
   if (!email || !pw) return toast('請填寫 Email 和密碼', 'err');
   initSb();
@@ -77,32 +81,16 @@ function doLogin() {
     enterApp(email);
   });
 }
-function doSignup() {
-  var email = $('loginEmail').value.trim(), pw = $('loginPw').value;
-  if (!email || !pw) return toast('請填寫 Email 和密碼', 'err');
-  initSb();
-  sb.auth.signUp({ email: email, password: pw }).then(function(res) {
-    if (res.error) return toast(res.error.message, 'err');
-    toast('註冊成功，請登入', 'ok');
-  });
-}
+function doSignup(){toast('請由管理員管理登入帳號','err');}
 function doLogout() {
   if (sb) sb.auth.signOut();
   userId = null; isDemo = false; stores = []; storeId = null;
   $('app').style.display = 'none';
   $('loginPage').style.display = '';
 }
-function enterDemo() {
-  isDemo = true; userId = 'demo';
-  products = JSON.parse(localStorage.getItem('proxy-demo-products') || '[]');
-  agents = JSON.parse(localStorage.getItem('proxy-demo-agents') || '[]');
-  customers = JSON.parse(localStorage.getItem('proxy-demo-customers') || '[]');
-  orders = JSON.parse(localStorage.getItem('proxy-demo-orders') || '[]');
-  ads = JSON.parse(localStorage.getItem('proxy-demo-ads') || '[]');
-  adConfigs = JSON.parse(localStorage.getItem('proxy-demo-adconfigs') || '[]');
-  enterApp('本機模式');
-}
+function enterDemo(){toast('正式網站不啟用測試資料','err');}
 function enterApp(label) {
+  if(window.phase1DatabaseEnabled)$('app').dataset.loading='true';
   $('loginPage').style.display = 'none';
   $('app').style.display = '';
   mpInit('mpDash', renderDashboard);
@@ -112,7 +100,7 @@ function enterApp(label) {
   // Share auth token with Chrome extension (if installed)
   shareTokenWithExtension();
 }
-function shareTokenWithExtension() {
+function shareTokenWithExtension() { return;
   if (isDemo || !sb) return;
   sb.auth.getSession().then(function(res) {
     if (res.data && res.data.session) {
@@ -125,6 +113,7 @@ function shareTokenWithExtension() {
   });
 }
 function autoLogin() {
+  if (window.LOCAL_TEST_CONFIG.demoOnly) { setTimeout(enterDemo, 0); return; }
   initSb();
   sb.auth.getSession().then(function(res) {
     if (res.data && res.data.session) {
@@ -147,17 +136,38 @@ function demoSave() {
   localStorage.setItem('proxy-demo-svcaccounts', JSON.stringify(serviceAccounts));
 }
 
-function loadStores() {
+async function readAllBusinessRows(table,column,ascending,withStore) {
+  var all=[],offset=0,total=null,stamp=String(userId)+'/'+String(storeId||'');
+  do {
+    var query=sb.from(table).select('*',{count:'exact'}).eq('user_id',userId);
+    if(withStore)query=storeFilter(query);
+    var result=await query.order(column,{ascending:ascending!==false}).order('id').range(offset,offset+499);
+    if(stamp!==String(userId)+'/'+String(storeId||''))throw new Error('店舖已切換，請重新讀取');
+    if(result.error||!Array.isArray(result.data)||!Number.isInteger(result.count))throw new Error('資料未完整讀取');
+    if(total!==null&&result.count!==total)throw new Error('讀取期間資料已改變，請重新整理');
+    total=result.count;all=all.concat(result.data);offset=all.length;
+    if(offset<total&&!result.data.length)throw new Error('資料頁面不完整');
+  }while(offset<total);
+  return all;
+}
+function blockIncompleteLoad(){
+  $('app').dataset.loading='true';
+  $('dataLoadError').hidden=false;
+  toast('資料未完整載入，已暫停操作；請重新整理','err');
+}
+async function loadStores() {
   if (isDemo) { stores = []; storeId = null; loadAll(); return; }
-  sb.from('stores').select('*').eq('user_id', userId).order('sort_order').then(function(res) {
-    stores = (res.data || []);
-    var saved = localStorage.getItem('proxy-storeId-' + userId);
-    if (saved && stores.some(function(s) { return s.id === saved; })) storeId = saved;
-    else if (stores.length > 0) storeId = (stores.filter(function(s){return s.is_default})[0] || stores[0]).id;
-    else storeId = null;
-    renderStoreSwitcher();
-    loadAll();
-  }).catch(function() { stores = []; storeId = null; loadAll(); });
+  $('app').dataset.loading='true';$('dataLoadError').hidden=true;
+  try{
+    var stamp=userId,loaded=await readAllBusinessRows('stores','sort_order',true,false);
+    if(userId!==stamp)return;
+    stores=loaded;
+    var saved=localStorage.getItem('proxy-storeId-'+userId);
+    if(saved&&stores.some(function(s){return s.id===saved;}))storeId=saved;
+    else if(stores.length)storeId=(stores.find(function(s){return s.is_default;})||stores[0]).id;
+    else storeId=null;
+    renderStoreSwitcher();await loadAll();
+  }catch(e){blockIncompleteLoad();}
 }
 function switchStore(id) {
   if (id === storeId) return;
@@ -193,38 +203,33 @@ function renderStoreSwitcher() {
   }
 }
 function storeFilter(query) {
-  return storeId ? query.eq('store_id', storeId) : query;
+  return storeId ? query.eq('store_id', storeId) : (window.phase1DatabaseEnabled ? query.is('store_id',null) : query);
 }
-function loadAll() {
-  if (isDemo) { renderAll(); return }
-  Promise.all([
-    storeFilter(sb.from('products').select('*').eq('user_id', userId)).order('sort_order'),
-    storeFilter(sb.from('agents').select('*').eq('user_id', userId)).order('created_at'),
-    storeFilter(sb.from('customers').select('*').eq('user_id', userId)).order('created_at'),
-    storeFilter(sb.from('orders').select('*').eq('user_id', userId)).order('order_date', { ascending: false }),
-    storeFilter(sb.from('ad_spends').select('*').eq('user_id', userId)).order('ad_date', { ascending: false }),
-    storeFilter(sb.from('service_accounts').select('*').eq('user_id', userId)).order('created_at')
-  ]).then(function(res) {
-    res.forEach(function(r, i) {
-      if (r && r.error) console.warn('Table load error [' + i + ']:', r.error.message);
-    });
-    products = res[0].data || [];
-    agents = res[1].data || [];
-    customers = res[2].data || [];
-    orders = res[3].data || [];
-    ads = res[4].data || [];
-    serviceAccounts = (res[5] && res[5].data) || [];
-    renderAll();
-    storeFilter(sb.from('ad_configs').select('*').eq('user_id', userId)).order('created_at', { ascending: false }).then(function(r2) {
-      if (r2 && r2.data) { adConfigs = r2.data; renderAds(); renderDashboard(); }
-    }).catch(function() { adConfigs = []; });
-  }).catch(function(err) {
-    console.error('loadAll failed:', err);
-    toast('載入失敗，請重新整理', 'err');
-  });
+async function loadAll() {
+  if(isDemo){renderAll();return;}
+  var loadScope=String(userId)+'/'+String(storeId||'');
+  $('app').dataset.loading='true';$('dataLoadError').hidden=true;
+  try{
+    var res=await Promise.all([
+      readAllBusinessRows('products','sort_order',true,true),
+      readAllBusinessRows('agents','created_at',true,true),
+      readAllBusinessRows('customers','created_at',true,true),
+      readAllBusinessRows('orders','order_date',false,true),
+      readAllBusinessRows('ad_spends','ad_date',false,true),
+      readAllBusinessRows('service_accounts','created_at',true,true),
+      readAllBusinessRows('ad_configs','created_at',false,true)
+    ]);
+    if(loadScope!==String(userId)+'/'+String(storeId||''))return;
+    products=res[0];agents=res[1];customers=res[2];orders=res[3];ads=res[4];serviceAccounts=res[5];adConfigs=res[6];
+    if(window.phase1DatabaseEnabled)await phase1Load();
+    if(loadScope!==String(userId)+'/'+String(storeId||''))return;
+    renderAll();$('app').dataset.loading='false';
+  }catch(e){if(loadScope===String(userId)+'/'+String(storeId||''))blockIncompleteLoad();}
 }
 
 function renderAll() {
+  renderProcurement();
+  syncCategorySelectors();
   var sh = $('stickyHeader');
   if (sh) document.documentElement.style.setProperty('--sticky-top', sh.offsetHeight + 'px');
   renderDashboard();
@@ -239,10 +244,11 @@ function renderAll() {
 
 /* ──── Tab switching ──── */
 function switchTab(name) {
+  var financeParent = {procurement:'financeDaily',cashLedger:'financeDaily',platformMonths:'financeDaily',afterSales:'financeDaily'};
   var tabs = document.querySelectorAll('.tab');
   var contents = document.querySelectorAll('.tab-content');
   for (var i = 0; i < tabs.length; i++)
-    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === name);
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === (financeParent[name] || name));
   for (var i = 0; i < contents.length; i++)
     contents[i].classList.toggle('active', contents[i].id === 'tab-' + name);
 }
@@ -253,6 +259,7 @@ function openModal(id) {
   $(id).classList.add('show');
 }
 function closeModal() {
+  if ($('categoryManagerModal') && $('categoryManagerModal').classList.contains('show')) {closeCategoryManager();return;}
   $('modalBg').classList.remove('show');
   var modals = document.querySelectorAll('.modal');
   for (var i = 0; i < modals.length; i++) modals[i].classList.remove('show');
@@ -275,7 +282,8 @@ function calcCommission(gross, commType, commVal) {
 function orderProfit(o) {
   var q = o.qty || 1;
   var rev = q * (o.unit_price || 0), cost = q * (o.unit_cost || 0);
-  var fee = channelFee(o.channel, o.unit_price || 0) * q;
+  var storedFee=o.fee_value!==null&&o.fee_value!==undefined&&o.fee_value!=='' ? Number(o.fee_value) : NaN;
+  var fee = Number.isFinite(storedFee) && storedFee>=0 ? (o.fee_type==='固定金額'?storedFee*q:rev*storedFee) : channelFee(o.channel, o.unit_price || 0) * q;
   var gross = rev - cost - fee;
   var comm = calcCommission(gross, o.commission_type || '百分比', o.commission_value || 0);
   return { rev: rev, cost: cost, fee: fee, gross: gross, comm: comm, profit: gross - comm };
@@ -289,57 +297,6 @@ function genOrderNo() {
   var seq = max + 1;
   return 'MWJ-' + String(seq).padStart(5, '0');
 }
-function adSpendCovered(a) {
-  var d = a.ad_date || '', p = a.ad_platform || '其他';
-  return adConfigs.some(function(c) {
-    if ((c.platform || '其他') !== p) return false;
-    return d >= (c.start_date || '') && d <= (c.end_date || '9999-12-31');
-  });
-}
-function monthAds(ym) {
-  var oldTotal = ads.filter(function(a) { return (a.ad_date || '').slice(0, 7) === ym && !adSpendCovered(a) })
-    .reduce(function(s, a) { return s + (a.amount || 0) }, 0);
-  return oldTotal + calcAdConfigCost(ym);
-}
-function calcAdConfigCost(ym) {
-  var t = today();
-  var mStart = ym + '-01';
-  var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
-  var mEndDate = new Date(y, m, 0);
-  var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
-  if (mEnd > t) mEnd = t;
-  if (mStart > t) return 0;
-  var total = 0;
-  adConfigs.forEach(function(c) {
-    var s = c.start_date || '';
-    var e = c.end_date || (!c.active ? t : '9999-12-31');
-    if (e > t) e = t;
-    if (e < mStart || s > mEnd) return;
-    var effStart = s > mStart ? s : mStart;
-    var effEnd = e < mEnd ? e : mEnd;
-    var d1 = new Date(effStart); var d2 = new Date(effEnd);
-    var days = Math.round((d2 - d1) / 86400000) + 1;
-    if (days > 0) total += days * (c.daily_cost || 0);
-  });
-  return total;
-}
-function calcAdConfigCostRange(startDate, endDate) {
-  var total = 0;
-  adConfigs.forEach(function(c) {
-    var t = today();
-    var s = c.start_date || '';
-    var e = c.end_date || (!c.active ? t : '9999-12-31');
-    if (e < startDate || s > endDate) return;
-    var effStart = s > startDate ? s : startDate;
-    var effEnd = e < endDate ? e : endDate;
-    var d1 = new Date(effStart); var d2 = new Date(effEnd);
-    var days = Math.round((d2 - d1) / 86400000) + 1;
-    if (days > 0) total += days * (c.daily_cost || 0);
-  });
-  return total;
-}
-
-/* ──── Month Picker Component ──── */
 var mpState = {};
 var MON_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 function mpInit(id, onChange) {
@@ -539,6 +496,7 @@ document.addEventListener('click', function(e) {
 
 /* ──── Dashboard ──── */
 function renderDashboard() {
+  if ($('adAccountingNotice')) $('adAccountingNotice').textContent = adConfigs.some(adNeedsReview) ? '廣告費有缺少暫停日期的舊資料，暫不列計；廣告合計與扣除廣告後利潤尚不完整，請先至廣告頁核對。' : '廣告費包含按日估算；同平台同日有已登記費用時，以登記費用取代估算。扣除廣告後利潤為試算。';
   try { _renderDashboard() } catch(e) { console.error('renderDashboard error:', e); toast('總覽載入失敗：' + e.message, 'err') }
 }
 function _renderDashboard() {
@@ -562,9 +520,9 @@ function _renderDashboard() {
   var orderProf = totalRev - totalCost - totalFee - totalComm;
 
   var adTotal = isAll
-    ? ads.filter(function(a){return !adSpendCovered(a)}).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + adConfigs.reduce(function(s,c){ var t=today(),sd=c.start_date||t,ed=c.end_date||(!c.active?t:t); if(ed>t)ed=t; if(sd>t)return s; return s+Math.max(0,Math.round((new Date(ed)-new Date(sd))/86400000)+1)*(c.daily_cost||0) },0)
+    ? ads.filter(function(a){return a.ad_date <= today()}).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + calcAdConfigCostRange('0001-01-01', today())
     : isYear
-      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy && !adSpendCovered(a) }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
+      ? ads.filter(function(a) { return (a.ad_date || '').slice(0, 4) === yy && a.ad_date <= today() }).reduce(function(s, a) { return s + (a.amount || 0) }, 0) + (function(){ var t=0; for(var mi=1;mi<=12;mi++){var mm=mi<10?'0'+mi:''+mi; t+=calcAdConfigCost(yy+'-'+mm)} return t })()
       : monthAds(ym);
   var netProfit = orderProf - adTotal;
   var margin = totalRev > 0 ? netProfit / totalRev : 0;
@@ -646,9 +604,8 @@ function _renderDashboard() {
   // Revenue line chart
   renderRevenueChart(completed, ym, isAll, isYear, yy);
 
-  // Dashboard expiry & cycle sections
+  // Dashboard expiry section
   renderDashboardExpiry();
-  renderDashboardCycle();
 }
 function renderRevenueChart(completed, ym, isAll, isYear, yy) {
   var el = $('revenueChart');
@@ -786,11 +743,12 @@ var expandedPlatforms = {};
 function renderProducts() {
   var q = ($('prodSearch').value || '').toLowerCase();
   var list = products.filter(function(p) {
+    if (!categoryMatches(p.platform, categoryFilter || 'all')) return false;
     if (!q) return true;
     return (p.platform + p.version + p.duration + p.notes).toLowerCase().indexOf(q) >= 0;
   });
   if (list.length === 0) {
-    $('productList').innerHTML = '<div class="empty"><div class="icon">📦</div><p>尚無商品，點擊上方新增</p></div>';
+    $('productList').innerHTML = '<div class="empty"><div class="icon">📦</div><p>沒有符合條件的商品，可調整分類或搜尋</p></div>';
     return;
   }
   // Group by platform
@@ -808,36 +766,28 @@ function renderProducts() {
         if (na && nb) return na - nb;
         return a.version < b.version ? -1 : 1;
       }
-      return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
+      return productDurationOrder(a.duration) - productDurationOrder(b.duration) || String(a.duration || '').localeCompare(String(b.duration || ''));
     });
     var isOpen = expandedPlatforms[plat] !== false;
     var activeCount = items.filter(function(p) { return p.status === '啟用' }).length;
     html += '<div class="prod-group card">' +
-      '<div class="prod-group-head" onclick="togglePlatform(\'' + esc(plat) + '\')">' +
+      '<div class="prod-group-head" data-platform="' + productAttr(plat) + '" onclick="togglePlatform(this.dataset.platform)">' +
         '<span class="prod-arrow">' + (isOpen ? '▼' : '▶') + '</span>' +
         '<span class="prod-plat-name">' + esc(plat) + '</span>' +
         '<span class="prod-count">' + activeCount + '/' + items.length + ' 啟用</span>' +
+        '<button type="button" class="btn sm ghost prod-add-option" data-platform="' + productAttr(plat) + '" onclick="event.stopPropagation();openProductBatchEdit(this.dataset.platform)">批次編輯</button>' +
+        '<button type="button" class="btn sm ghost prod-add-option" data-platform="' + productAttr(plat) + '" onclick="event.stopPropagation();openProductBatch(this.dataset.platform)">＋ 新增方案</button>' +
       '</div>';
     if (isOpen) {
-      html += '<div class="table-scroll"><table class="prod-table"><thead><tr><th>版本</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">8591淨利</th><th class="text-right">蝦皮售價</th><th class="text-right">蝦皮淨利</th><th>狀態</th><th>資料</th><th>操作</th></tr></thead><tbody>';
+      html += '<div class="table-scroll"><table class="prod-table"><colgroup><col style="width:22%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:14%"><col style="width:10%"><col style="width:16%"></colgroup><thead><tr><th>方案</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">蝦皮售價</th><th>狀態</th><th>操作</th></tr></thead><tbody>';
       items.forEach(function(p) {
-        var fee8591 = p.price * PLATFORM_FEE;
-        var prof8591 = p.price - p.cost - fee8591;
-        var sp = p.shopee_price || 0;
-        var feeShopee = sp * getShopFee();
-        var profShopee = sp > 0 ? sp - p.cost - feeShopee : 0;
-        html += '<tr><td>' + esc(p.version) + '</td><td>' + esc(p.duration) + '</td>' +
-          '<td class="text-right">' + fmtN(p.cost) + '</td>' +
-          '<td class="text-right">' + fmtN(p.price) + '</td>' +
-          '<td class="text-right ' + (prof8591 >= 0 ? 'text-green' : 'text-red') + '">' + fmtN(prof8591) + '</td>' +
-          '<td class="text-right">' + (sp > 0 ? fmtN(sp) : '-') + '</td>' +
-          '<td class="text-right ' + (profShopee >= 0 ? 'text-green' : 'text-red') + '">' + (sp > 0 ? fmtN(profShopee) : '-') + '</td>' +
+        html += '<tr><td><strong>' + esc(p.version || '標準方案') + '</strong></td><td>' + esc(p.duration || '未設定') + '</td>' +
+          '<td class="text-right">' + fmtN(p.cost || 0) + '</td>' +
+          '<td class="text-right">' + fmtN(p.price || 0) + '</td>' +
+          '<td class="text-right">' + (p.shopee_price > 0 ? fmtN(p.shopee_price) : '—') + '</td>' +
           '<td>' + (p.status === '啟用' ? '<span class="badge active">啟用</span>' : '<span class="badge inactive">停用</span>') + '</td>' +
-          '<td class="text-sm">' + esc(p.required_info || '') + '</td>' +
-          '<td><div class="act-group">' +
-            '<button class="act-btn edit" data-action="editProduct" data-id="' + p.id + '">編輯</button>' +
-            '<button class="act-btn del" data-action="deleteProduct" data-id="' + p.id + '">刪除</button>' +
-          '</div></td></tr>';
+          '<td><div class="act-group"><button class="act-btn" data-action="productDetail" data-id="' + productAttr(p.id) + '">詳情</button>' +
+          '<button class="act-btn edit" data-action="editProduct" data-id="' + productAttr(p.id) + '">編輯</button></div></td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -858,6 +808,8 @@ function updatePlatformList() {
   $('platformList').innerHTML = h;
 }
 function openProductModal(item) {
+  syncCategorySelectors(); $('pm_category').value = categoryId(item ? item.platform : ''); cdropSetValue('pm_categoryDropdown',$('pm_category').value);
+  syncPurchaseDefaults('pm',item);
   $('prodModalTitle').textContent = item ? '編輯商品' : '新增商品';
   $('pm_id').value = item ? item.id : '';
   $('pm_platform').value = item ? item.platform : '';
@@ -893,6 +845,7 @@ function editProduct(id) {
   else toast('找不到此商品', 'err');
 }
 function saveProduct() {
+  try{validatePurchaseDefaults('pm');}catch(e){return toast(e.message,'err');}
   var obj = {
     platform: $('pm_platform').value.trim(),
     version: $('pm_version').value.trim(),
@@ -910,6 +863,7 @@ function saveProduct() {
   if (!obj.platform) return toast('請填寫平台/商品名稱', 'err');
   var id = $('pm_id').value;
   if (isDemo) {
+    var productsBeforeDefaultSave = JSON.parse(JSON.stringify(products));
     if (id) {
       var idx = products.findIndex(function(p) { return String(p.id) === String(id) });
       if (idx >= 0) Object.assign(products[idx], obj);
@@ -918,6 +872,8 @@ function saveProduct() {
       obj.sort_order = products.length;
       products.push(obj);
     }
+    try{savePurchaseDefaults('pm',[id?products.find(function(p){return String(p.id)===String(id);}):obj]);}catch(e){products=productsBeforeDefaultSave;return toast(e.message,'err');}
+    assignProductCategory(obj.platform,$('pm_category').value); localStorage.setItem('preview-product-categories-v1',JSON.stringify(categoryState));
     demoSave(); closeModal(); renderAll(); toast('商品已儲存', 'ok');
   } else {
     obj.user_id = userId;
@@ -964,7 +920,7 @@ function cdropRenderPanel(id) {
   var s = inst.state, o = inst.opts;
   var panel = document.querySelector('[data-cdrop-panel="' + id + '"]');
   if (!panel) return;
-  var selItem = s.value ? s.items.filter(function(it) { return String(it.value) === String(s.value) })[0] : null;
+  var selItem = s.items.filter(function(it) { return String(it.value) === String(s.value) })[0] || null;
   var isSelectedLabel = selItem && s.text === selItem.label;
   var q = isSelectedLabel ? '' : s.text.toLowerCase();
   var filtered = q ? s.items.filter(function(it) {
@@ -1089,62 +1045,6 @@ document.addEventListener('click', function(e) {
 });
 
 /* ──── Orders ──── */
-function renderOrders() {
-  var q = ($('orderSearch').value || '').toLowerCase();
-  var status = $('orderStatusFilter').value;
-  var channel = $('orderChannelFilter').value;
-  var ym = mpGetYM('mpOrders');
-  var isAll = mpIsAll('mpOrders');
-  var isYear = mpIsYear('mpOrders');
-  var yy = mpGetYear('mpOrders');
-  var list = orders.filter(function(o) {
-    if (status && o.status !== status) return false;
-    if (channel && (o.channel || '8591') !== channel) return false;
-    if (!isAll) {
-      var d = o.order_date || '';
-      if (isYear ? d.slice(0, 4) !== yy : d.slice(0, 7) !== ym) return false;
-    }
-    if (q) {
-      var s = (o.order_no + o.platform + o.version + o.notes + getAgentName(o.agent_id) + getCustomerName(o.customer_id)).toLowerCase();
-      if (s.indexOf(q) < 0) return false;
-    }
-    return true;
-  });
-  list.sort(function(a, b) { return (b.order_no || '').localeCompare(a.order_no || '') });
-  if (list.length === 0) {
-    $('orderList').innerHTML = '<div class="empty"><div class="icon">📋</div><p>尚無訂單</p></div>';
-    return;
-  }
-  var h = '<div class="table-scroll"><table style="min-width:1100px"><tr><th>編號</th><th>日期</th><th>管道</th><th>出單人</th><th>客戶</th><th>商品</th><th>數量</th><th class="text-right">售價</th><th class="text-right">成本</th><th class="text-right">手續費</th><th class="text-right">利潤</th><th>狀態</th><th>到期</th><th class="sticky-col">操作</th></tr>';
-  list.forEach(function(o) {
-    var p = orderProfit(o);
-    var expiry = o.expiry_date || '';
-    var expiryWarn = '';
-    if (expiry && o.status === '已完成') {
-      var diff = (new Date(expiry) - new Date()) / 86400000;
-      if (diff < 0) expiryWarn = ' text-red';
-      else if (diff < 7) expiryWarn = ' text-yellow';
-    }
-    h += '<tr><td style="font-size:.8rem;white-space:nowrap">' + esc(o.order_no || '') + '</td>' +
-      '<td>' + (o.order_date || '') + '</td>' +
-      '<td>' + channelBadge(o.channel) + '</td>' +
-      '<td>' + esc(getAgentName(o.agent_id)) + '</td>' +
-      '<td>' + esc(getCustomerName(o.customer_id)) + '</td>' +
-      '<td>' + esc(o.platform) + ' ' + esc(o.version || '') + '</td>' +
-      '<td class="text-center">' + (o.qty || 1) + '</td>' +
-      '<td class="text-right">' + fmtN(p.rev) + '</td>' +
-      '<td class="text-right">' + fmtN(p.cost) + '</td>' +
-      '<td class="text-right">' + fmtN(p.fee) + '</td>' +
-      '<td class="text-right ' + (p.profit >= 0 ? 'text-green' : 'text-red') + '">' + fmtN(p.profit) + '</td>' +
-      '<td>' + statusBadge(o.status) + '</td>' +
-      '<td class="' + expiryWarn + '">' + (expiry ? expiry.slice(5) : '') + '</td>' +
-      '<td class="sticky-col"><div class="act-group">' +
-        '<button class="act-btn edit" data-action="editOrder" data-id="' + o.id + '">編輯</button>' +
-        '<button class="act-btn del" data-action="deleteOrder" data-id="' + o.id + '">刪除</button>' +
-      '</div></td></tr>';
-  });
-  $('orderList').innerHTML = h + '</table></div>';
-}
 function getAgentName(id) {
   if (!id) return '';
   var a = agents.filter(function(x) { return String(x.id) === String(id) })[0];
@@ -1157,11 +1057,8 @@ function getCustomerName(id) {
 }
 function onChannelChange(skipPrice) {
   var ch = $('om_channel').value;
-  var isPersonal = ch === '個人';
-  $('om_manualGroup').style.display = isPersonal ? '' : 'none';
-  $('om_productGroup').style.display = '';
-  if (isPersonal) renderPersonalSelect();
-  if (!skipPrice) {
+  syncOrderProductMode();
+  if (!skipPrice && $('om_productMode').value === 'catalog') {
     var pid = $('om_product').value;
     var p = pid ? products.filter(function(x) { return String(x.id) === String(pid) })[0] : null;
     if (p) {
@@ -1172,8 +1069,9 @@ function onChannelChange(skipPrice) {
   calcOrderPreview();
 }
 function renderPersonalSelect(selected) {
-  var presets = getPersonalPresets();
+  var presets = Array.from(new Set(getPersonalPresets().concat(orders.filter(function(o) { return !o.product_id; }).map(function(o) { return o.platform; })).filter(Boolean)));
   var sel = selected || $('om_manualName').value || '';
+  if (sel && !presets.includes(sel)) presets.push(sel);
   var prItems = presets.map(function(p) {
     return { value: p, label: p, icon: p.charAt(0), iconCls: 'accent' };
   });
@@ -1204,15 +1102,17 @@ function onPersonalSelect() {
   calcOrderPreview();
 }
 function openOrderModal(item) {
+  previewRenewalParent = '';
+  syncCategorySelectors(); $('orderCategoryFilter').value='all'; cdropSetValue('orderCategoryFilterDropdown','all');
   renewExpiryBase = '';
   $('orderModalTitle').textContent = item ? '編輯訂單' : '新增訂單';
   $('om_id').value = item ? item.id : '';
   dpInit('om_date', { value: item ? item.order_date : today() });
-  var defChannel = localStorage.getItem('proxy-default-channel') || '8591';
+  var defChannel = businessDefault('channel') || '8591';
   $('om_channel').value = item ? (item.channel || '8591') : defChannel;
 
   // Agent custom dropdown
-  var savedAgentId = localStorage.getItem('proxy-default-agent') || '';
+  var savedAgentId = businessDefault('agent') || '';
   var selfAgent = agents.filter(function(a) { return a.name === '自己' })[0];
   var defaultAgentId = savedAgentId || (selfAgent ? String(selfAgent.id) : '');
   var agItems = [];
@@ -1259,25 +1159,7 @@ function openOrderModal(item) {
   });
   $('om_customer').value = item ? (item.customer_id || '') : '';
 
-  // Product custom dropdown
-  var prItems = [];
-  products.filter(function(p) { return p.status === '啟用' }).slice().sort(function(a, b) {
-    if (a.platform !== b.platform) return a.platform < b.platform ? -1 : 1;
-    if (a.version !== b.version) {
-      var na = parseInt(a.version) || 0, nb = parseInt(b.version) || 0;
-      if (na && nb) return na - nb;
-      return a.version < b.version ? -1 : 1;
-    }
-    return (parseInt(a.duration) || 0) - (parseInt(b.duration) || 0);
-  }).forEach(function(p) {
-    var showPrice = p.price;
-    prItems.push({ value: String(p.id), label: p.version + ' ' + p.duration, icon: (p.platform || '').charAt(0), iconCls: 'accent', sub: p.platform, tag: 'NT$' + fmtN(showPrice) });
-  });
-  cdropInit('om_productDrop', {
-    items: prItems, placeholder: '搜尋或選擇商品...', value: item ? String(item.product_id || '') : '',
-    onSelect: function(v) { $('om_product').value = v; onProductSelect(); }
-  });
-  $('om_product').value = item ? (item.product_id || '') : '';
+  initOrderProductChoices(item);
 
   $('om_qty').value = item ? item.qty : 1;
   $('om_unitPrice').value = item ? item.unit_price : '';
@@ -1289,7 +1171,7 @@ function openOrderModal(item) {
     { value: '已取消', label: '已取消', icon: '✕', iconCls: 'accent' },
     { value: '已退款', label: '已退款', icon: '↩', iconCls: 'accent' }
   ];
-  var defStatus = localStorage.getItem('proxy-default-status') || '已完成';
+  var defStatus = businessDefault('status') || '已完成';
   cdropInit('om_statusDrop', {
     items: statusItems, placeholder: '選擇狀態', value: item ? item.status : defStatus,
     onSelect: function(v) { $('om_status').value = v; }
@@ -1304,10 +1186,10 @@ function openOrderModal(item) {
   $('om_seat').value = item ? (item.seat_number || '') : '';
   $('om_seatGroup').style.display = 'none';
 
-  // Set personal select when editing a personal-channel order
-  if (item && (item.channel || '8591') === '個人' && !item.product_id) {
-    renderPersonalSelect(item.platform || '');
-  }
+  $('om_productMode').value = item && !item.product_id ? 'temporary' : 'catalog';
+  $('om_manualVersion').value = item && !item.product_id ? item.version || '' : '';
+  $('om_manualDuration').value = item && !item.product_id ? item.duration || '' : '';
+  renderPersonalSelect(item && !item.product_id ? item.platform || '' : '');
 
   onChannelChange(!!item);
   // Show seat selection if editing order with service account, or product has accounts
@@ -1334,15 +1216,9 @@ function onProductSelect() {
     var usePrice = ((ch === '蝦皮' || ch === '個人') && p.shopee_price) ? p.shopee_price : p.price;
     $('om_unitPrice').value = usePrice;
     $('om_unitCost').value = p.cost;
-    var dur = p.duration || '';
-    var months = parseInt(dur) || 0;
-    if (months > 0) {
-      var base = dpGetVal('om_startDate') || dpGetVal('om_date') || today();
-      if (!dpGetVal('om_startDate')) dpSetVal('om_startDate', base);
-      var d = new Date(base);
-      d.setMonth(d.getMonth() + months);
-      dpSetVal('om_expiry', d.toISOString().slice(0, 10));
-    }
+    var base = dpGetVal('om_startDate') || dpGetVal('om_date') || today();
+    if (!dpGetVal('om_startDate')) dpSetVal('om_startDate', base);
+    setProductExpiry(base, p.duration || '');
     calcOrderPreview();
     // Seat management: show account/seat if platform has service accounts
     var accts = serviceAccounts.filter(function(a) { return a.platform === p.platform && a.status === '啟用' });
@@ -1387,8 +1263,11 @@ function initSeatDrop(accountId) {
       var isCurrentOrder = editingId && s.order && String(s.order.id) === String(editingId);
       var canRenew = !s.renewal && !isCurrentOrder;
       return { value: String(s.seat), label: lbl, sub: s.customer + '（到期 ' + s.expiry + '）', tag: canRenew ? '可續約' : s.renewal ? '已排續約' : '已佔用', tagCls: 'green', disabled: !isCurrentOrder && !canRenew };
+    } else if (s.status === 'reserved') {
+      var editingReservation = editingId && s.renewal && String(s.renewal.id) === String(editingId);
+      return {value:String(s.seat),label:lbl,sub:'已有預約，非空位',tag:'已預約',disabled:!editingReservation};
     } else if (s.status === 'expired') {
-      return { value: String(s.seat), label: lbl, sub: s.customer + '（已過期）', tag: '待處理', tagCls: 'yellow' };
+      return { value: String(s.seat), label: lbl, sub: s.customer + '（已過期）', tag: '待移除', tagCls: 'yellow', disabled: true };
     }
     return { value: String(s.seat), label: lbl, sub: '', tag: '空位', tagCls: '' };
   });
@@ -1432,39 +1311,29 @@ function editOrder(id) {
   }
   else toast('找不到此訂單 (id=' + id + ', 共' + orders.length + '筆)', 'err');
 }
-function resolveCustomer(name, callback) {
-  // Find existing customer by name, or auto-create a new one
-  if (!name) return callback(null);
-  var existing = customers.filter(function(c) { return c.name === name })[0];
-  if (existing) return callback(existing.id);
-
-  // Auto-create new customer
-  if (isDemo) {
-    var nc = { id: 'd' + Date.now(), name: name, contact: '', platform: '', notes: '自動建立' };
-    customers.push(nc);
-    demoSave();
-    toast('已自動新增客戶「' + name + '」', 'ok');
-    return callback(nc.id);
-  }
-
-  sb.from('customers').insert({ user_id: userId, store_id: storeId, name: name, contact: '', platform: '', notes: '自動建立' })
-    .select().then(function(res) {
-      if (res.error) { toast('建立客戶失敗：' + res.error.message, 'err'); return callback(null); }
-      var nc = res.data[0];
-      customers.push(nc);
-      toast('已自動新增客戶「' + name + '」', 'ok');
-      callback(nc.id);
-    });
+var resolvingCustomers={};
+function resolveCustomer(name,callback){
+  if(!name)return callback(null);
+  var existing=customers.find(function(c){return c.name===name;});if(existing)return callback(existing.id);
+  if(isDemo){var nc={id:'d'+Date.now(),name:name,contact:'',platform:'',notes:'自動建立'};customers.push(nc);demoSave();return callback(nc.id);}
+  var stamp=String(userId)+'/'+String(storeId||''),key=stamp+'/'+name;
+  if(!resolvingCustomers[key])resolvingCustomers[key]=Promise.resolve(sb.from('customers').insert({user_id:userId,store_id:storeId,name:name,contact:'',platform:'',notes:'自動建立'}).select()).then(function(res){
+    if(res.error||!res.data||!res.data[0])throw new Error('客戶未確認建立成功，請重新讀取確認');
+    var row=res.data[0];if(stamp===String(userId)+'/'+String(storeId||''))customers.push(row);return row.id;
+  }).catch(function(){toast('客戶未確認建立成功，訂單未送出，請重新讀取確認','err');return null;}).finally(function(){delete resolvingCustomers[key];});
+  resolvingCustomers[key].then(callback);
 }
 
 function saveOrder() {
-  var pid = $('om_product').value;
+  var temporary = $('om_productMode').value === 'temporary';
+  var pid = temporary ? '' : $('om_product').value;
   var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
+  if (!temporary && !pid) return toast('請先選擇商品及方案', 'err');
   var agId = $('om_agent').value || null;
   var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var ch = $('om_channel').value;
   var personalInst = cdropInstances['om_personalDrop'];
-  var manualName = $('om_manualName').value.trim() || (personalInst ? (personalInst.state.value || personalInst.state.text || '').trim() : '');
+  var manualName = personalInst ? (personalInst.state.text || '').trim() : $('om_manualName').value.trim();
   var custId = $('om_customer').value || null;
   // If customer dropdown has free text but no ID, resolve by name
   var custInst = cdropInstances['om_customerDrop'];
@@ -1484,8 +1353,8 @@ function saveOrder() {
     status: $('om_status').value,
     product_id: pid || null,
     platform: p ? p.platform : manualName,
-    version: p ? p.version : '',
-    duration: p ? p.duration : '',
+    version: p ? p.version : $('om_manualVersion').value.trim(),
+    duration: p ? p.duration : $('om_manualDuration').value.trim(),
     qty: Number($('om_qty').value) || 1,
     unit_price: Number($('om_unitPrice').value) || 0,
     unit_cost: Number($('om_unitCost').value) || 0,
@@ -1504,11 +1373,24 @@ function saveOrder() {
   if (!obj.platform) return toast('請選擇商品或輸入商品名稱', 'err');
 
   var id = $('om_id').value;
-  if (id) obj.order_no = orders.filter(function(o) { return String(o.id) === String(id) })[0].order_no;
+  if (id) {
+    var originalOrder = orders.find(function(o) { return String(o.id) === String(id); });
+    if (!originalOrder) return toast('找不到原訂單，請重新整理後確認', 'err');
+    obj.order_no = originalOrder.order_no;
+    // Preserve the fee snapshot on unrelated edits. Changing channel creates a new rate.
+    if(originalOrder.channel===ch){obj.fee_type=originalOrder.fee_type;obj.fee_value=originalOrder.fee_value;}
+
+    if (String(originalOrder.product_id || '') === String(pid || '') && pid) {
+      obj.platform = originalOrder.platform; obj.version = originalOrder.version; obj.duration = originalOrder.duration;
+    }
+  }
 
   // If still no custId but has free text, auto-create customer then save
   if (!custId && custFreeText) {
+    var customerScope=String(userId)+'/'+String(storeId||'');
     resolveCustomer(custFreeText, function(newId) {
+      if(!newId)return;
+      if(customerScope!==String(userId)+'/'+String(storeId||''))return toast('店舖已切換，訂單未送出，請重新讀取','err');
       obj.customer_id = newId;
       _doSaveOrder(obj, id);
     });
@@ -1519,6 +1401,10 @@ function saveOrder() {
 
 function _doSaveOrder(obj, id) {
   if (isDemo) {
+    if (!id && previewRenewalParent) {
+      if (orders.some(function(o) {return String(o.preview_renewal_parent || '') === previewRenewalParent && o.status !== '已取消' && o.status !== '已退款';})) return toast('此期已有接續訂單，請先查看續約歷程，避免重複建立', 'err');
+      obj.preview_renewal_parent = previewRenewalParent;
+    } else if (!id) obj.preview_purchase = true;
     if (id) {
       var idx = orders.findIndex(function(o) { return String(o.id) === String(id) });
       if (idx >= 0) Object.assign(orders[idx], obj);
@@ -1719,12 +1605,23 @@ function renderCustomers() {
   });
   $('customerList').innerHTML = h + '</table>';
 }
+function customerSourceOptions(rows,current){
+  var names=['','8591','蝦皮','IG','LINE'];
+  (rows||[]).forEach(function(c){if(c.platform)names.push(String(c.platform));});if(current)names.push(String(current));
+  return Array.from(new Set(names)).map(function(name){return {value:name,label:name||'未設定'};});
+}
 function openCustomerModal(item) {
   $('custModalTitle').textContent = item ? '編輯客戶' : '新增客戶';
   $('cm_id').value = item ? item.id : '';
   $('cm_name').value = item ? item.name : '';
   $('cm_contact').value = item ? (item.contact || '') : '';
   $('cm_platform').value = item ? (item.platform || '') : '';
+  var sourceItems=customerSourceOptions(customers,item&&item.platform);
+  cdropInit('cm_platformDrop',{items:sourceItems,placeholder:'選擇來源平台（選填）',value:$('cm_platform').value,allowCreate:true,
+    onSelect:function(v){$('cm_platform').value=v;},
+    onCreate:function(name){name=String(name||'').trim();if(!name)return;var inst=cdropInstances.cm_platformDrop;if(!inst.state.items.some(function(it){return it.value===name;}))inst.state.items.push({value:name,label:name});$('cm_platform').value=name;cdropSetValue('cm_platformDrop',name);cdropClose('cm_platformDrop');}
+  });
+
   $('cm_notes').value = item ? (item.notes || '') : '';
   openModal('customerModal');
 }
@@ -1734,6 +1631,8 @@ function editCustomer(id) {
   else toast('找不到此客戶', 'err');
 }
 function saveCustomer() {
+  var sourceInput=document.querySelector('[data-cdrop-input="cm_platformDrop"]');
+  if(sourceInput) $('cm_platform').value=sourceInput.value.trim()==='未設定'?'':sourceInput.value.trim();
   var obj = {
     name: $('cm_name').value.trim(),
     contact: $('cm_contact').value.trim(),
@@ -1748,7 +1647,7 @@ function saveCustomer() {
       var idx = customers.findIndex(function(c) { return String(c.id) === String(id) });
       if (idx >= 0) Object.assign(customers[idx], obj);
     } else {
-      obj.id = 'd' + Date.now();
+      obj.id = crypto.randomUUID();
       customers.push(obj);
     }
     demoSave(); closeModal(); renderAll(); toast('客戶已儲存', 'ok');
@@ -1778,145 +1677,6 @@ function deleteCustomer(id) {
 }
 
 /* ──── Ads (Config-based) ──── */
-function adConfigStatus(c) {
-  if (!c.active) return { label: '已暫停', cls: 'badge grey' };
-  var t = today();
-  if (c.start_date > t) return { label: '未開始', cls: 'badge blue' };
-  if (c.end_date && c.end_date < t) return { label: '已結束', cls: 'badge grey' };
-  return { label: '投放中', cls: 'badge green' };
-}
-function adConfigDaysInMonth(c, ym) {
-  var t = today();
-  var mStart = ym + '-01';
-  var parts = ym.split('-'); var y = Number(parts[0]); var m = Number(parts[1]);
-  var mEndDate = new Date(y, m, 0);
-  var mEnd = ym + '-' + (mEndDate.getDate() < 10 ? '0' : '') + mEndDate.getDate();
-  if (mEnd > t) mEnd = t;
-  if (mStart > t) return 0;
-  var s = c.start_date || '';
-  var e = c.end_date || (!c.active ? t : '9999-12-31');
-  if (e > t) e = t;
-  if (e < mStart || s > mEnd) return 0;
-  var effStart = s > mStart ? s : mStart;
-  var effEnd = e < mEnd ? e : mEnd;
-  var d1 = new Date(effStart); var d2 = new Date(effEnd);
-  return Math.max(0, Math.round((d2 - d1) / 86400000) + 1);
-}
-function renderAds() {
-  var ym = mpGetYM('mpExp');
-  var isAll = mpIsAll('mpExp');
-  var isYear = mpIsYear('mpExp');
-  var yy = mpGetYear('mpExp');
-
-  // Calculate costs from configs
-  var platMap = {};
-  var total = 0;
-  adConfigs.forEach(function(c) {
-    var cost = 0;
-    if (isAll) {
-      var t = today();
-      var s = c.start_date || t;
-      var e = c.end_date || t;
-      if (!c.active && !e) e = t;
-      if (e > t) e = t;
-      if (s > t) return;
-      var d1 = new Date(s); var d2 = new Date(e);
-      cost = Math.max(0, Math.round((d2 - d1) / 86400000) + 1) * (c.daily_cost || 0);
-    } else if (isYear) {
-      for (var mi = 1; mi <= 12; mi++) {
-        var mm = mi < 10 ? '0' + mi : '' + mi;
-        cost += adConfigDaysInMonth(c, yy + '-' + mm) * (c.daily_cost || 0);
-      }
-    } else {
-      cost = adConfigDaysInMonth(c, ym) * (c.daily_cost || 0);
-    }
-    if (cost > 0) {
-      var p = c.platform || '其他';
-      if (!platMap[p]) platMap[p] = 0;
-      platMap[p] += cost;
-      total += cost;
-    }
-  });
-  // Add old ad_spends records (skip dates covered by a config on same platform)
-  ads.forEach(function(a) {
-    var d = a.ad_date || '';
-    var match = isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
-    if (!match) return;
-    var p = a.ad_platform || '其他';
-    var covered = adConfigs.some(function(c) {
-      if ((c.platform || '其他') !== p) return false;
-      var cs = c.start_date || '';
-      var ce = c.end_date || '9999-12-31';
-      return d >= cs && d <= ce;
-    });
-    if (covered) return;
-    if (!platMap[p]) platMap[p] = 0;
-    platMap[p] += a.amount || 0;
-    total += a.amount || 0;
-  });
-
-  var statHtml = statCard('總廣告費', 'NT$' + fmtN(total), '', 'red');
-  Object.keys(platMap).sort(function(a, b) { return platMap[b] - platMap[a] }).forEach(function(p) {
-    statHtml += statCard(p, 'NT$' + fmtN(platMap[p]), fmtP(total > 0 ? platMap[p] / total : 0));
-  });
-  $('expStatCards').innerHTML = statHtml;
-
-  // Render config cards
-  if (adConfigs.length === 0) {
-    $('adConfigList').innerHTML = '<div class="empty"><div class="icon">📢</div><p>尚無廣告設定</p><p class="text-sm">新增設定後，系統會自動計算每月廣告費</p></div>';
-    return;
-  }
-  var h = '';
-  adConfigs.forEach(function(c) {
-    var st = adConfigStatus(c);
-    var endTxt = c.end_date || '持續投放';
-    var days = isAll ? '' : (isYear ? '' : adConfigDaysInMonth(c, ym) + ' 天');
-    var mCost = isAll ? '' : (isYear ? '' : 'NT$' + fmtN(adConfigDaysInMonth(c, ym) * (c.daily_cost || 0)));
-    h += '<div class="card" style="margin-bottom:8px;padding:14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-        '<div style="display:flex;align-items:center;gap:8px"><strong>' + esc(c.platform || '') + '</strong><span class="' + st.cls + '">' + st.label + '</span></div>' +
-        '<div class="act-group">' +
-          (c.active
-            ? '<button class="act-btn" data-action="toggleAdConfig" data-id="' + c.id + '">暫停</button>'
-            : '<button class="act-btn edit" data-action="toggleAdConfig" data-id="' + c.id + '">恢復</button>') +
-          '<button class="act-btn edit" data-action="editAdConfig" data-id="' + c.id + '">編輯</button>' +
-          '<button class="act-btn del" data-action="deleteAdConfig" data-id="' + c.id + '">刪除</button>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--fg2)">' +
-        '<span>每日 <b class="text-red">NT$' + fmtN(c.daily_cost || 0) + '</b></span>' +
-        '<span>' + (c.start_date || '') + ' → ' + endTxt + '</span>' +
-        (days ? '<span>本月 ' + days + ' / ' + mCost + '</span>' : '') +
-        (c.notes ? '<span>📝 ' + esc(c.notes) + '</span>' : '') +
-      '</div>' +
-    '</div>';
-  });
-  $('adConfigList').innerHTML = h;
-  // Render ad_spends records
-  var filteredAds = ads.filter(function(a) {
-    var d = a.ad_date || '';
-    return isAll || (isYear ? d.slice(0, 4) === yy : d.slice(0, 7) === ym);
-  });
-  var uncovered = filteredAds.filter(function(a) { return !adSpendCovered(a) });
-  if (uncovered.length > 0) {
-    var ah = '<h4 style="margin:16px 0 8px;font-size:.95rem">單筆廣告紀錄</h4>';
-    uncovered.forEach(function(a) {
-      ah += '<div class="card" style="margin-bottom:8px;padding:14px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div style="display:flex;align-items:center;gap:12px">' +
-            '<strong>' + esc(a.ad_platform || '其他') + '</strong>' +
-            '<span style="color:var(--fg2);font-size:.85rem">' + (a.ad_date || '') + '</span>' +
-            (a.notes ? '<span style="color:var(--fg3);font-size:.85rem">📝 ' + esc(a.notes) + '</span>' : '') +
-          '</div>' +
-          '<b class="text-red">NT$' + fmtN(a.amount || 0) + '</b>' +
-        '</div>' +
-      '</div>';
-    });
-    $('adSpendList').innerHTML = ah;
-  } else {
-    $('adSpendList').innerHTML = '';
-  }
-}
 function toggleAdcEnd() {
   var chk = $('adc_noend');
   var wrap = $('adc_end');
@@ -1931,6 +1691,7 @@ function toggleAdcEnd() {
 function openAdConfigModal(item) {
   $('adConfigModalTitle').textContent = item ? '編輯廣告設定' : '新增廣告設定';
   $('adc_id').value = item ? item.id : '';
+  $('adc_platform').value = item ? item.platform || '' : '';
   var platItems = ['8591','Dcard','Facebook','Instagram','蝦皮','Google'].map(function(p) {
     return { value: p, label: p };
   });
@@ -1957,55 +1718,6 @@ function editAdConfig(id) {
   var item = adConfigs.filter(function(c) { return String(c.id) === String(id) })[0];
   if (item) openAdConfigModal(item);
   else toast('找不到此設定', 'err');
-}
-function saveAdConfig() {
-  var noEnd = $('adc_noend').checked;
-  var obj = {
-    platform: ($('adc_platform').value || (cdropInstances['adc_platformDrop'] ? cdropInstances['adc_platformDrop'].state.text : '')).trim(),
-    daily_cost: Number($('adc_daily').value) || 0,
-    start_date: dpGetVal('adc_start'),
-    end_date: noEnd ? null : (dpGetVal('adc_end') || null),
-    notes: $('adc_notes').value.trim(),
-    active: true,
-    store_id: storeId
-  };
-  if (!obj.platform) return toast('請填寫廣告平台', 'err');
-  if (!obj.daily_cost) return toast('請填寫每日金額', 'err');
-  if (!obj.start_date) return toast('請選擇開始日期', 'err');
-  var id = $('adc_id').value;
-  if (isDemo) {
-    if (id) {
-      var idx = adConfigs.findIndex(function(c) { return String(c.id) === String(id) });
-      if (idx >= 0) { obj.active = adConfigs[idx].active; Object.assign(adConfigs[idx], obj); }
-    } else {
-      obj.id = 'd' + Date.now();
-      adConfigs.unshift(obj);
-    }
-    demoSave(); closeModal(); renderAll(); toast('廣告設定已儲存', 'ok');
-  } else {
-    obj.user_id = userId;
-    var req = id
-      ? sb.from('ad_configs').update(obj).eq('id', id)
-      : sb.from('ad_configs').insert(obj);
-    req.then(function(res) {
-      if (res.error) return toast('儲存失敗：' + res.error.message, 'err');
-      closeModal(); loadAll(); toast('廣告設定已儲存', 'ok');
-    });
-  }
-}
-function toggleAdConfig(id) {
-  var item = adConfigs.filter(function(c) { return String(c.id) === String(id) })[0];
-  if (!item) return;
-  var newActive = !item.active;
-  if (isDemo) {
-    item.active = newActive;
-    demoSave(); renderAll(); toast(newActive ? '已恢復投放' : '已暫停', 'ok');
-  } else {
-    sb.from('ad_configs').update({ active: newActive }).eq('id', id).then(function(res) {
-      if (res.error) return toast(res.error.message, 'err');
-      loadAll(); toast(newActive ? '已恢復投放' : '已暫停', 'ok');
-    });
-  }
 }
 function deleteAdConfig(id) {
   confirmAction('確定要刪除此廣告設定？', function() {
@@ -2062,9 +1774,23 @@ document.addEventListener('click', function(e) {
   var action = btn.getAttribute('data-action');
   var id = btn.getAttribute('data-id');
   switch (action) {
-    case 'editProduct': editProduct(id); break;
+    case 'refundPaid': openRefundPayment(id); break;
+    case 'supplierOpening': openSupplierOpening(id); break;
+    case 'supplierCompensation': openSupplierCompensation(id); break;
+    case 'afterSale': openAfterSale(id); break;
+    case 'financeAccount': openFinanceAccount(id); break;
+    case 'createProcurement': openProcurement(id); break;
+    case 'supplierPayment': openSupplierPayment(id,btn.getAttribute('data-purchase-id')); break;
+    case 'supplierAdvance': applySupplierAdvance(id); break;
+    case 'productDetail': openProductDetail(id); break;
+    case 'editProduct': closeModal(); editProduct(id); break;
     case 'deleteProduct': deleteProduct(id); break;
-    case 'editOrder': editOrder(id); break;
+    case 'orderDetail': openOrderDetail(id); break;
+    case 'saveCommonProduct': saveCommonProduct(id); break;
+    case 'renewOrder': closeModal(); renewOrder(id); break;
+    case 'releaseSeat': requestSeatRelease(id, btn.getAttribute('data-seat-value')); break;
+    case 'undoSeatRelease': requestSeatReleaseUndo(id, btn.getAttribute('data-seat-value')); break;
+    case 'editOrder': closeModal(); editOrder(id); break;
     case 'deleteOrder': deleteOrder(id); break;
     case 'editAgent': editAgent(id); break;
     case 'deleteAgent': deleteAgent(id); break;
@@ -2078,39 +1804,6 @@ document.addEventListener('click', function(e) {
 });
 
 /* ──── Service Accounts (Seat Management) ──── */
-function getSeatStatus(accountId) {
-  var acct = serviceAccounts.filter(function(a) { return String(a.id) === String(accountId) })[0];
-  if (!acct) return [];
-  var td = today();
-  var seats = [];
-  for (var i = 1; i <= acct.max_seats; i++) {
-    var seatOrders = orders.filter(function(o) {
-      return String(o.service_account_id) === String(accountId) && o.seat_number === i && o.status === '已完成' && o.expiry_date;
-    }).sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || '') });
-    // Find current active order (order_date <= today AND expiry >= today)
-    var current = null, renewal = null;
-    seatOrders.forEach(function(o) {
-      if (o.order_date <= td && o.expiry_date >= td) current = o;
-      if (o.order_date > td) renewal = o;
-    });
-    // Fallback: if no current, find the most recently expired
-    var lastExpired = null;
-    if (!current) {
-      var expired = seatOrders.filter(function(o) { return o.expiry_date < td });
-      if (expired.length) lastExpired = expired[expired.length - 1];
-    }
-    var ref = current || lastExpired;
-    if (current) {
-      seats.push({ seat: i, status: 'occupied', order: current, customer: getCustomerName(current.customer_id), expiry: current.expiry_date, days_left: Math.ceil((new Date(current.expiry_date) - new Date(td)) / 86400000), renewal: renewal });
-    } else if (lastExpired) {
-      seats.push({ seat: i, status: renewal ? 'occupied' : 'expired', order: lastExpired, customer: getCustomerName(lastExpired.customer_id), expiry: lastExpired.expiry_date, days_left: Math.ceil((new Date(lastExpired.expiry_date) - new Date(td)) / 86400000), renewal: renewal });
-    } else {
-      seats.push({ seat: i, status: 'empty', order: null, customer: '', expiry: '', days_left: 0, renewal: null });
-    }
-  }
-  return seats;
-}
-
 function renderAccountManager() {
   var el = $('svcAccountList');
   if (!el) return;
@@ -2130,7 +1823,7 @@ function renderAccountManager() {
       '<button class="btn sm ghost text-red" onclick="deleteSvcAccount(\'' + a.id + '\')">刪除</button></td></tr>';
   });
   h += '</table>';
-  el.innerHTML = h;
+  el.innerHTML = h + serviceAccounts.map(seatReleaseHistory).join('');
 }
 
 function getSvcAccount(id) {
@@ -2195,9 +1888,12 @@ function renewSeat(accountId, seatNum, oldOrderId) {
   var presetCustId = oldOrder ? (oldOrder.customer_id || '') : '';
   openOrderModal(null);
   if (oldOrder) {
-    var expiryBase = oldOrder.expiry_date || today();
+    prepareRenewalProduct(oldOrder);
+    $('orderModalTitle').textContent = '續約｜建立新一期（日期可修改）';
+    var expiryBase = oldOrder.expiry_date && oldOrder.expiry_date > today() ? oldOrder.expiry_date : today();
     dpSetVal('om_date', today());
     dpSetVal('om_startDate', expiryBase);
+    if (!oldOrder.product_id) setProductExpiry(expiryBase, oldOrder.duration || '');
     if (oldOrder.product_id) {
       $('om_product').value = oldOrder.product_id;
       cdropInstances['om_productDrop'].state.value = String(oldOrder.product_id);
@@ -2214,12 +1910,7 @@ function renewSeat(accountId, seatNum, oldOrderId) {
         var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
         $('om_unitPrice').value = usePrice;
         $('om_unitCost').value = prod.cost;
-        var months = parseInt(prod.duration) || 0;
-        if (months > 0) {
-          var d = new Date(expiryBase);
-          d.setMonth(d.getMonth() + months);
-          dpSetVal('om_expiry', d.toISOString().slice(0, 10));
-        }
+        setProductExpiry(expiryBase, prod.duration || '');
         calcOrderPreview();
       }
     }
@@ -2249,12 +1940,15 @@ function renewSeat(accountId, seatNum, oldOrderId) {
 function renewOrder(oldOrderId) {
   var oldOrder = orders.filter(function(o) { return String(o.id) === String(oldOrderId) })[0];
   if (!oldOrder) return;
-  var expiryBase = oldOrder.expiry_date || today();
+  var expiryBase = oldOrder.expiry_date && oldOrder.expiry_date > today() ? oldOrder.expiry_date : today();
   var presetCustId = oldOrder.customer_id || '';
   var presetChannel = oldOrder.channel || '8591';
   openOrderModal(null);
+  $('orderModalTitle').textContent = '續約｜建立新一期（日期可修改）';
+  prepareRenewalProduct(oldOrder);
   dpSetVal('om_date', today());
   dpSetVal('om_startDate', expiryBase);
+  if (!oldOrder.product_id) setProductExpiry(expiryBase, oldOrder.duration || '');
   $('om_channel').value = presetChannel;
   onChannelChange();
   if (oldOrder.product_id) {
@@ -2273,12 +1967,7 @@ function renewOrder(oldOrderId) {
       var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
       $('om_unitPrice').value = usePrice;
       $('om_unitCost').value = prod.cost;
-      var months = parseInt(prod.duration) || 0;
-      if (months > 0) {
-        var d = new Date(expiryBase);
-        d.setMonth(d.getMonth() + months);
-        dpSetVal('om_expiry', d.toISOString().slice(0, 10));
-      }
+      setProductExpiry(expiryBase, prod.duration || '');
       var accts = serviceAccounts.filter(function(a) { return a.platform === prod.platform && a.status === '啟用' });
       if (accts.length > 0) {
         $('om_seatGroup').style.display = '';
@@ -2321,30 +2010,23 @@ function deleteSvcAccount(id) {
 
 /* ──── Settings ──── */
 function openSettings() {
-  var mode = localStorage.getItem('proxy-ocr-mode') || 'free';
-  $('set_ocrMode').value = mode;
-  $('set_apiKey').value = localStorage.getItem('proxy-api-key') || '';
-  $('apiKeyGroup').style.display = mode === 'ai' ? '' : 'none';
-  $('set_ocrMode').onchange = function() {
-    $('apiKeyGroup').style.display = this.value === 'ai' ? '' : 'none';
-  };
   // Order defaults
   var defAgItems = agents.map(function(a) { return { value: String(a.id), label: a.name, icon: a.name.charAt(0), iconCls: 'accent' }; });
   cdropInit('set_defaultAgentDrop', {
-    items: defAgItems, placeholder: '選擇出單人', value: localStorage.getItem('proxy-default-agent') || '',
+    items: defAgItems, placeholder: '選擇出單人', value: businessDefault('agent') || '',
     onSelect: function(v) { $('set_defaultAgent').value = v; }
   });
-  $('set_defaultAgent').value = localStorage.getItem('proxy-default-agent') || '';
+  $('set_defaultAgent').value = businessDefault('agent') || '';
   var chItems = [
     { value: '8591', label: '8591', icon: '🎮', iconCls: 'accent' },
     { value: '蝦皮', label: '蝦皮', icon: '🛒', iconCls: 'accent' },
     { value: '個人', label: '個人', icon: '👤', iconCls: 'accent' }
   ];
   cdropInit('set_defaultChannelDrop', {
-    items: chItems, placeholder: '選擇管道', value: localStorage.getItem('proxy-default-channel') || '8591',
+    items: chItems, placeholder: '選擇管道', value: businessDefault('channel') || '8591',
     onSelect: function(v) { $('set_defaultChannel').value = v; }
   });
-  $('set_defaultChannel').value = localStorage.getItem('proxy-default-channel') || '8591';
+  $('set_defaultChannel').value = businessDefault('channel') || '8591';
   var stItems = [
     { value: '已完成', label: '已完成', icon: '✓', iconCls: 'accent' },
     { value: '處理中', label: '處理中', icon: '⏳', iconCls: 'accent' },
@@ -2353,20 +2035,18 @@ function openSettings() {
     { value: '已退款', label: '已退款', icon: '↩', iconCls: 'accent' }
   ];
   cdropInit('set_defaultStatusDrop', {
-    items: stItems, placeholder: '選擇狀態', value: localStorage.getItem('proxy-default-status') || '已完成',
+    items: stItems, placeholder: '選擇狀態', value: businessDefault('status') || '已完成',
     onSelect: function(v) { $('set_defaultStatus').value = v; }
   });
-  $('set_defaultStatus').value = localStorage.getItem('proxy-default-status') || '已完成';
+  $('set_defaultStatus').value = businessDefault('status') || '已完成';
 
   renderAccountManager();
+  initSettingsPreferences();
+  showSettingsPanel('orders');
   openModal('settingsModal');
 }
 function saveSettings() {
-  var mode = $('set_ocrMode').value;
-  localStorage.setItem('proxy-ocr-mode', mode);
-  var key = $('set_apiKey').value.trim();
-  if (key) localStorage.setItem('proxy-api-key', key);
-  else localStorage.removeItem('proxy-api-key');
+  if (!saveDisplayPreferences()) return;
   // Order defaults
   var da = $('set_defaultAgent').value;
   if (da) localStorage.setItem('proxy-default-agent', da); else localStorage.removeItem('proxy-default-agent');
@@ -2411,9 +2091,10 @@ function getSubscriptions() {
 }
 
 function renderSubscriptions() {
-  var subs = getSubscriptions();
+  var subs = getSubscriptions().filter(function(s){return categoryMatches(s.platform,categoryFilter || 'all');});
   var filter = $('subsFilter') ? $('subsFilter').value : 'active';
   var q = ($('subsSearch') ? $('subsSearch').value : '').toLowerCase();
+  var renewalHistoryCount = renderSubscriptionRenewals(filter, q);
 
   var renewalSet = {};
   subs.forEach(function(s) {
@@ -2429,18 +2110,13 @@ function renderSubscriptions() {
     }
   });
 
-  var cycleCount = subs.filter(function(s) { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3 && !isCycleDismissed(s); }).length;
-  var badge = $('cycleBadge');
-  if (badge) {
-    if (cycleCount > 0) { badge.style.display = ''; badge.textContent = cycleCount; }
-    else { badge.style.display = 'none'; }
-  }
 
   var filtered = subs.filter(function(s) {
+    var original = orders.find(function(o) { return String(o.id) === String(s.id); });
+    if (original && renewalFamily(original).length > 1) return false;
     if (filter === 'active') return s.days_left >= 0;
     if (filter === 'expiring') return s.days_left >= 0 && s.days_left <= 7;
-    if (filter === 'renewal') return hasRenewal[s.id];
-    if (filter === 'cycle') { var cl = getCycleDaysLeft(s); return cl >= 0 && cl <= 3; }
+    if (filter === 'renewal') return false;
     if (filter === 'expired') return s.days_left < 0;
     return true;
   });
@@ -2465,8 +2141,8 @@ function renderSubscriptions() {
       '<div class="subs-stat"><div class="ss-val">' + expired + '</div><div class="ss-label">已過期</div></div>';
   }
 
-  if (filtered.length === 0) {
-    $('subsList').innerHTML = '<div class="empty"><div class="icon">📅</div><p>沒有符合條件的訂閱</p></div>';
+  if (filtered.length === 0 && !serviceAccounts.some(function(a){return a.status === '啟用' && categoryMatches(a.platform,categoryFilter || 'all');})) {
+    $('subsList').innerHTML = renewalHistoryCount ? '' : '<div class="empty"><div class="icon">📅</div><p>沒有符合條件的訂閱</p></div>';
     if ($('subsNav')) $('subsNav').innerHTML = '';
     return;
   }
@@ -2478,6 +2154,8 @@ function renderSubscriptions() {
     if (!groups[key]) groups[key] = [];
     groups[key].push(s);
   });
+
+  serviceAccounts.forEach(function(a){if(a.status === '啟用' && categoryMatches(a.platform,categoryFilter || 'all') && !groups[a.platform]) groups[a.platform]=[];});
 
   // Sort groups: platforms with most urgent items first
   var groupKeys = Object.keys(groups).sort(function(a, b) {
@@ -2518,13 +2196,14 @@ function renderSubscriptions() {
         var emptyCount = seats.filter(function(s) { return s.status === 'empty' }).length;
         var expiredCount = seats.filter(function(s) { return s.status === 'expired' }).length;
         var occupiedCount = seats.filter(function(s) { return s.status === 'occupied' }).length;
+        var reservedCount = seats.filter(function(s) {return s.status === 'reserved';}).length;
         var cardId = grpId; grpId = '';
         html += '<div class="acct-card"' + (cardId ? ' id="' + cardId + '"' : '') + '>' +
           '<div class="acct-card-head" onclick="this.parentElement.classList.toggle(\'collapsed\')">' +
             '<div><div class="acct-card-title">' + esc(acct.email) + '</div>' +
             '<div class="acct-card-sub">' + esc(plat) + ' · ' + occupiedCount + '/' + acct.max_seats + ' 使用中' +
             (expiredCount > 0 ? ' · <span class="text-yellow">' + expiredCount + ' 待處理</span>' : '') +
-            (emptyCount > 0 ? ' · <span class="text-green">' + emptyCount + ' 空位</span>' : '') +
+            (emptyCount > 0 ? ' · <span class="text-green">' + emptyCount + ' 空位</span>' : '') + (reservedCount ? ' · '+reservedCount+' 已預約' : '') +
             '</div></div>' +
             '<span class="subs-group-arrow">▼</span>' +
           '</div>' +
@@ -2539,18 +2218,16 @@ function renderSubscriptions() {
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry">' + s.expiry + ' · <span class="' + (s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green') + '">' + s.days_left + ' 天後到期</span></div>';
             if (oNotes) html += '<div class="seat-notes">📝 ' + esc(oNotes) + '</div>';
-            if (s.renewal) {
-              html += '<div class="seat-expiry" style="margin-top:2px"><span class="seat-badge green">已排續約</span> ' + s.renewal.order_date + ' → ' + s.renewal.expiry_date + '</div>';
-            }
+
           } else if (s.status === 'expired') {
             var eNotes = s.order ? (s.order.notes || '') : '';
             html += '<div class="seat-customer">' + esc(s.customer) + '</div>' +
               '<div class="seat-expiry"><span class="text-red">' + Math.abs(s.days_left) + ' 天前到期</span></div>';
             if (eNotes) html += '<div class="seat-notes">📝 ' + esc(eNotes) + '</div>';
-          } else {
+          } else if (s.status === 'empty') {
             html += '<div class="seat-customer" style="color:var(--fg3)">空位</div>';
           }
-          html += '</div><div class="seat-actions">';
+          html += renderSeatState(s, acct.id) + '</div><div class="seat-actions">';
           if (s.status === 'occupied') {
             html += '<button class="btn sm ghost" data-action="editOrder" data-id="' + s.order.id + '">編輯</button>';
             if (!s.renewal) {
@@ -2559,7 +2236,7 @@ function renderSubscriptions() {
           } else if (s.status === 'expired') {
             html += '<button class="btn sm primary" onclick="renewSeat(\'' + acct.id + '\',' + s.seat + ',\'' + (s.order ? s.order.id : '') + '\')">續約</button>';
           }
-          html += '</div></div>';
+          html += renderSeatActions(s, acct.id) + '</div></div>';
         });
         html += '</div></div></div>';
       });
@@ -2574,15 +2251,6 @@ function renderSubscriptions() {
     renderSubGroup(items, plat, grpId);
   });
 
-  function cycleTag(s) {
-    var cl = getCycleDaysLeft(s);
-    if (cl < 0) return '';
-    if (isCycleDismissed(s)) return '<div class="sub-cycle dimmed">✅ 已提醒</div>';
-    var cls = cl <= 2 ? 'text-red' : cl <= 5 ? 'text-yellow' : 'text-green';
-    return '<div class="sub-cycle">🔄 換家庭倒數 <span class="' + cls + '">' + cl + ' 天</span>' +
-      ' <button class="btn xs ghost" onclick="event.stopPropagation();dismissCycle(\'' + s.id + '\')">已提醒</button></div>';
-  }
-
   function renderSubCard(s) {
     var cls = s.days_left < 0 ? 'expired' : s.days_left <= 2 ? 'urgent' : s.days_left <= 7 ? 'warning' : '';
     var daysCls = s.days_left < 0 ? 'text-grey' : s.days_left <= 2 ? 'text-red' : s.days_left <= 7 ? 'text-yellow' : 'text-green';
@@ -2595,7 +2263,6 @@ function renderSubscriptions() {
         (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
         (s.account_info ? '<div class="sub-account">🔑 ' + esc(s.account_info) + '</div>' : '') +
         '<div class="sub-dates">📅 ' + s.start_date + ' → ' + s.expiry_date + '</div>' +
-        cycleTag(s) +
         (s.notes ? '<div class="sub-notes">📝 ' + esc(s.notes) + '</div>' : '') +
       '</div>' +
       '<div class="sub-actions">' +
@@ -2650,7 +2317,6 @@ function renderSubscriptions() {
           ' <span class="sub-merge-badge">' + group.length + ' 筆訂單</span></div>' +
           (who ? '<div class="sub-buyer">👤 ' + esc(who) + '</div>' : '') +
           (latest.account_info ? '<div class="sub-account">🔑 ' + esc(latest.account_info) + '</div>' : '') +
-          cycleTag(latest) +
           '<div class="sub-timeline">';
       group.forEach(function(s, i) {
         var sCls = s.days_left < 0 ? 'past' : i === 0 ? 'current' : 'future';
@@ -2675,67 +2341,6 @@ function renderSubscriptions() {
   }
 
   $('subsList').innerHTML = html;
-}
-
-function getCycleDaysLeft(s) {
-  if (s.platform !== 'YouTube Premium') return -1;
-  var months = parseInt(s.duration) || 0;
-  if (months <= 1 || s.days_left < 0) return -1;
-  var start = new Date(s.start_date || s.order_date);
-  var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
-  var elapsed = Math.floor((now - start) / 86400000);
-  if (elapsed < 0) return -1;
-  if (elapsed === 0) return 30;
-  var inCycle = elapsed % 30;
-  return inCycle === 0 ? 0 : 30 - inCycle;
-}
-function getCycleNum(s) {
-  var start = new Date(s.start_date || s.order_date);
-  var now = new Date(); now.setHours(0,0,0,0); start.setHours(0,0,0,0);
-  var elapsed = Math.floor((now - start) / 86400000);
-  return Math.floor(elapsed / 30);
-}
-function isCycleDismissed(s) {
-  var key = 'cycleDismiss_' + s.id + '_' + getCycleNum(s);
-  return localStorage.getItem(key) === '1';
-}
-function dismissCycle(id) {
-  var subs = getSubscriptions();
-  var s = subs.filter(function(x) { return x.id === id; })[0];
-  if (!s) return;
-  localStorage.setItem('cycleDismiss_' + id + '_' + getCycleNum(s), '1');
-  renderDashboardCycle();
-  renderSubscriptions();
-}
-
-function renderDashboardCycle() {
-  var subs = getSubscriptions().filter(function(s) {
-    var cl = getCycleDaysLeft(s);
-    return cl >= 0 && cl <= 3 && !isCycleDismissed(s);
-  });
-  if (!$('dashCycle')) return;
-  if (subs.length === 0) {
-    $('dashCycleCard').style.display = 'none';
-    return;
-  }
-  $('dashCycleCard').style.display = '';
-  var html = '';
-  subs.forEach(function(s) {
-    var cl = getCycleDaysLeft(s);
-    var daysCls = cl <= 1 ? 'text-red' : 'text-yellow';
-    var daysText = cl === 0 ? '今天' : cl + '天';
-    var who = s.customer || s.buyer || '';
-    html += '<div class="dash-expiry-item">' +
-      '<div class="de-days ' + daysCls + '">' + daysText + '</div>' +
-      '<div class="de-info">' +
-        '<div class="de-product">' + esc(s.version || s.platform) + (s.duration ? ' (' + esc(s.duration) + ')' : '') + '</div>' +
-        (who ? '<div class="de-buyer">👤 ' + esc(who) + '</div>' : '') +
-        (s.account_info ? '<div class="de-buyer">🔑 ' + esc(s.account_info) + '</div>' : '') +
-      '</div>' +
-      '<button class="btn sm ghost" onclick="dismissCycle(\'' + s.id + '\')">已提醒</button>' +
-    '</div>';
-  });
-  $('dashCycle').innerHTML = html;
 }
 
 function renderDashboardExpiry() {
@@ -2769,7 +2374,7 @@ function renderDashboardExpiry() {
   $('dashExpiry').innerHTML = html;
 }
 
-function checkExpiryNotifications() {
+function checkExpiryNotifications() { return;
   var subs = getSubscriptions().filter(function(s) { return s.days_left >= 0 && s.days_left <= 2; });
 
   // Show/hide alert bar
@@ -2808,7 +2413,7 @@ function checkExpiryNotifications() {
   }
 }
 
-function sendExpiryNotification(subs) {
+function sendExpiryNotification(subs) { return;
   var body = subs.map(function(s) {
     var who = s.customer || s.buyer || '';
     var d = s.days_left === 0 ? '今天到期' : s.days_left + '天後到期';
@@ -2824,37 +2429,20 @@ function sendExpiryNotification(subs) {
   } catch(e) { console.warn('Notification error:', e); }
 }
 
-/* ──── OCR Screenshot Import ──── */
+/* ──── Pasted Text Import ──── */
 var ocrParsedOrders = [];
-var ocrImageBase64 = '';
 
 function openImportModal() {
   resetImport();
   openModal('importModal');
 }
 
-function switchImportTab(tab) {
-  var tabs = document.querySelectorAll('.import-tab');
-  var contents = document.querySelectorAll('.import-tab-content');
-  for (var i = 0; i < tabs.length; i++) {
-    tabs[i].classList.toggle('active', tabs[i].textContent.indexOf(tab === 'paste' ? '貼上' : '截圖') >= 0);
-  }
-  $('importTab-paste').classList.toggle('active', tab === 'paste');
-  $('importTab-screenshot').classList.toggle('active', tab === 'screenshot');
-}
-
 function resetImport() {
   ocrParsedOrders = [];
-  ocrImageBase64 = '';
-  $('ocrPlaceholder').style.display = '';
-  $('ocrPreviewImg').style.display = 'none';
-  $('ocrStatus').style.display = 'none';
   $('ocrResults').style.display = 'none';
   $('btnOcrImport').style.display = 'none';
   $('btnOcrRetry').style.display = 'none';
-  $('ocrFile').value = '';
   $('pasteArea').value = '';
-  switchImportTab('paste');
 }
 
 function parsePastedText() {
@@ -2866,105 +2454,6 @@ function parsePastedText() {
     return;
   }
   showOcrResults();
-}
-
-// Click to upload
-document.addEventListener('click', function(e) {
-  if (e.target.closest('#ocrPlaceholder')) {
-    $('ocrFile').click();
-  }
-});
-
-// Paste image (Ctrl+V)
-document.addEventListener('paste', function(e) {
-  // Only handle when import modal is open
-  if (!$('importModal').classList.contains('show')) return;
-  var items = (e.clipboardData || {}).items || [];
-  for (var i = 0; i < items.length; i++) {
-    if (items[i].type.indexOf('image') >= 0) {
-      e.preventDefault();
-      var file = items[i].getAsFile();
-      if (file) {
-        switchImportTab('screenshot');
-        handleOcrFile(file);
-      }
-      return;
-    }
-  }
-});
-
-// Drag & drop
-document.addEventListener('dragover', function(e) {
-  var area = e.target.closest('#ocrUploadArea');
-  if (area) { e.preventDefault(); area.classList.add('dragover') }
-});
-document.addEventListener('dragleave', function(e) {
-  var area = e.target.closest('#ocrUploadArea');
-  if (area) area.classList.remove('dragover');
-});
-document.addEventListener('drop', function(e) {
-  var area = e.target.closest('#ocrUploadArea');
-  if (!area) return;
-  e.preventDefault();
-  area.classList.remove('dragover');
-  var file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) handleOcrFile(file);
-});
-
-function onOcrFileSelect(e) {
-  var file = e.target.files[0];
-  if (file) handleOcrFile(file);
-}
-
-function handleOcrFile(file) {
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var dataUrl = e.target.result;
-    ocrImageBase64 = dataUrl.split(',')[1];
-    var mediaType = file.type || 'image/png';
-
-    // Show preview
-    $('ocrPreviewImg').src = dataUrl;
-    $('ocrPreviewImg').style.display = '';
-    $('ocrPlaceholder').style.display = 'none';
-    $('ocrStatus').style.display = 'flex';
-    $('btnOcrRetry').style.display = '';
-
-    var mode = localStorage.getItem('proxy-ocr-mode') || 'free';
-    if (mode === 'ai' && localStorage.getItem('proxy-api-key')) {
-      callClaudeVision(ocrImageBase64, mediaType);
-    } else {
-      callTesseractOCR(file);
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-/* ──── Free OCR: Tesseract.js ──── */
-function callTesseractOCR(file) {
-  Tesseract.recognize(file, 'chi_tra+eng', {
-    logger: function(m) {
-      if (m.status === 'recognizing text' && m.progress) {
-        var pct = Math.round(m.progress * 100);
-        $('ocrStatus').querySelector('span').textContent = '辨識中... ' + pct + '%';
-      }
-    }
-  }).then(function(result) {
-    var text = result.data.text;
-    console.log('===== OCR 原始文字 =====');
-    console.log(text);
-    console.log('========================');
-    ocrParsedOrders = parseOcrText(text);
-    if (ocrParsedOrders.length === 0) {
-      $('ocrStatus').style.display = 'none';
-      toast('沒有辨識到訂單資料，請確認截圖清晰', 'err');
-      return;
-    }
-    showOcrResults();
-  }).catch(function(err) {
-    $('ocrStatus').style.display = 'none';
-    toast('辨識失敗：' + err.message, 'err');
-  });
 }
 
 /* Parse OCR text into order objects
@@ -3143,68 +2632,7 @@ function parseOcrBlock(block) {
   return result;
 }
 
-/* ──── AI OCR: Claude Vision (optional, paid) ──── */
-function callClaudeVision(base64, mediaType) {
-  var apiKey = localStorage.getItem('proxy-api-key');
-  if (!apiKey) { toast('請先設定 API Key', 'err'); return }
-
-  $('ocrStatus').querySelector('span').textContent = 'AI 辨識中，請稍候...';
-
-  var prompt = '你是一個 8591 訂單資料擷取工具。請分析這張截圖中的所有訂單資料。\n\n' +
-    '每筆訂單請擷取以下欄位：\n' +
-    '- order_date: 下單時間（格式 YYYY-MM-DD）\n' +
-    '- platform: 商品平台（如 Discord Nitro, YouTube Premium, Netflix 等）\n' +
-    '- version: 品項詳情（如「加成3個月」「贈禮版/30天」等）\n' +
-    '- qty: 數量（數字）\n' +
-    '- unit_price: 售價（數字，不含$符號）\n' +
-    '- buyer: 買家編號\n' +
-    '- status: 狀態（已完成/處理中/未付款/已取消/已退款）\n\n' +
-    '請直接回傳 JSON 陣列格式，不要加任何說明文字，格式如下：\n' +
-    '[{"order_date":"2026-06-07","platform":"Discord Nitro","version":"加成3個月 - 2次","qty":1,"unit_price":320,"buyer":"No.3492787","status":"已完成"}]';
-
-  fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
-  })
-  .then(function(res) {
-    if (!res.ok) {
-      return res.json().then(function(err) {
-        throw new Error(err.error ? err.error.message : 'API 錯誤 ' + res.status);
-      });
-    }
-    return res.json();
-  })
-  .then(function(data) {
-    var text = data.content[0].text.trim();
-    var jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('無法解析回應');
-    ocrParsedOrders = JSON.parse(jsonMatch[0]);
-    showOcrResults();
-  })
-  .catch(function(err) {
-    $('ocrStatus').style.display = 'none';
-    toast('辨識失敗：' + err.message, 'err');
-  });
-}
-
 function showOcrResults() {
-  $('ocrStatus').style.display = 'none';
   $('ocrResults').style.display = '';
   $('btnOcrImport').style.display = '';
 
@@ -3330,7 +2758,7 @@ function importOcrOrders() {
       fee_value: PLATFORM_FEE,
       commission_type: '百分比',
       commission_value: 0,
-      notes: '截圖匯入' + (o.buyer ? ' | 買家' + o.buyer : ''),
+      notes: '文字匯入' + (o.buyer ? ' | 買家' + o.buyer : ''),
       store_id: storeId
     };
   });
@@ -3361,3 +2789,20 @@ function esc(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+/* Settings use existing management pages and the same data stores. */
+function showSettingsPanel(name){
+ document.querySelectorAll('[data-setting-panel]').forEach(function(el){el.hidden=el.dataset.settingPanel!==name;});
+ document.querySelectorAll('[data-setting-tab]').forEach(function(el){el.classList.toggle('active',el.dataset.settingTab===name);el.setAttribute('aria-pressed',String(el.dataset.settingTab===name));});
+}
+function settingsGo(tab){closeModal();var finance=['suppliers','financeAccounts','financeDaily'].includes(tab);setWorkspace(finance?'finance':'operations');switchTab(tab);if(tab==='suppliers')renderProcurement();if(tab==='financeAccounts')renderFinanceAccounts();}
+function displayPreferences(){var p;try{p=JSON.parse(localStorage.getItem('preview-display-preferences-v1')||'{}');}catch(e){p={};}return p&&typeof p==='object'?p:{};}
+function initSettingsPreferences(){var p=displayPreferences();[
+ ['home',[['dashboard','營運總覽'],['orders','訂單'],['subs','訂閱'],['financeOverview','財務總覽']],p.home||'dashboard'],
+ ['density',[['normal','標準'],['compact','緊湊']],p.density||'normal'],
+ ['notes',[['pending','未處理'],['all','全部'],['done','已處理']],p.notes||'pending']
+ ].forEach(function(spec){var id='set_'+spec[0];$(id).value=spec[2];cdropInit(id+'Drop',{items:spec[1].map(function(x){return {value:x[0],label:x[1]};}),value:spec[2],onSelect:function(v){$(id).value=v;}});});}
+function saveDisplayPreferences(){try{var p={home:$('set_home').value,density:$('set_density').value,notes:$('set_notes').value};if(!['dashboard','orders','subs','financeOverview'].includes(p.home)||!['normal','compact'].includes(p.density)||!['pending','all','done'].includes(p.notes))throw new Error('請選擇有效的畫面偏好');localStorage.setItem('preview-display-preferences-v1',JSON.stringify(p));applyDisplayPreferences(false);return true;}catch(e){toast('偏好未儲存：'+e.message,'err');return false;}}
+function applyDisplayPreferences(home){var p=displayPreferences();document.body.dataset.tableDensity=p.density==='compact'?'compact':'normal';if(home&&p.home){setWorkspace(p.home==='financeOverview'?'finance':'operations');switchTab(['dashboard','orders','subs','financeOverview'].includes(p.home)?p.home:'dashboard');}}
+
+function businessDefault(key){if(!isDemo&&window.phase1DatabaseEnabled)return phase1Preference(key);return localStorage.getItem('proxy-default-'+key);}

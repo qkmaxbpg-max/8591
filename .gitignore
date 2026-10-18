@@ -1,0 +1,6 @@
+*.dump
+*.backup
+*.pgpass
+.env*
+backups/
+.local*
