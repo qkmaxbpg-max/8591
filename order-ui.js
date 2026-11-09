@@ -126,7 +126,7 @@ function initOrderProductChoices(item) {
   $('om_product').value = item ? item.product_id || '' : '';
 }
 function initOrderPlanChoices(platform, selected, original) {
-  var items = products.filter(function(p) { return p.platform === platform && (p.status === '啟用' || String(p.id) === selected); }).sort(function(a,b) { return productDurationOrder(a.duration) - productDurationOrder(b.duration); }).map(function(p) {
+  var items = products.filter(function(p) { return p.platform === platform && (p.status === '啟用' || String(p.id) === selected); }).sort(compareProductPlans).map(function(p) {
     return {value:String(p.id), label:[p.version || '標準方案',p.duration].filter(Boolean).join(' · '), tag:'NT$' + fmtN(p.price), sub:p.status === '啟用' ? '' : '歷史停用方案'};
   });
   if (selected && !items.some(function(p) {return p.value === selected;}) && original) items.push({value:selected,label:[original.version, original.duration].filter(Boolean).join(' · ') || '歷史方案',sub:'沿用原訂單紀錄'});

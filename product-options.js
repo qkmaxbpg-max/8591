@@ -22,6 +22,18 @@ function productDurationOrder(value) {
   var d = parseProductDuration(value);
   return d ? d.count * ({ days: 1, weeks: 7, months: 30, years: 365 })[d.unit] : Infinity;
 }
+var productPlanCollator = new Intl.Collator('zh-Hant', {numeric:true});
+function compareProductPlans(a, b) {
+  var av = String(a.version || '').normalize('NFKC').trim() || '標準方案';
+  var bv = String(b.version || '').normalize('NFKC').trim() || '標準方案';
+  function rank(name) {
+    return /^(?:登入版?|登錄版?)$/.test(name) ? 0 : /^贈禮版?$/.test(name) ? 1 : /^免登版?$/.test(name) ? 2 : 3;
+  }
+  return rank(av) - rank(bv) || productPlanCollator.compare(av,bv) ||
+    (av === bv ? 0 : av < bv ? -1 : 1) ||
+    productDurationOrder(a.duration) - productDurationOrder(b.duration) ||
+    productPlanCollator.compare(String(a.duration || ''),String(b.duration || ''));
+}
 function productExpiryDate(start, duration) {
   var parsed = parseProductDuration(duration), parts = String(start || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!parsed || !parts) return '';

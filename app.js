@@ -760,14 +760,7 @@ function renderProducts() {
   });
   var html = '';
   Object.keys(groups).sort().forEach(function(plat) {
-    var items = groups[plat].slice().sort(function(a, b) {
-      if (a.version !== b.version) {
-        var na = parseInt(a.version) || 0, nb = parseInt(b.version) || 0;
-        if (na && nb) return na - nb;
-        return a.version < b.version ? -1 : 1;
-      }
-      return productDurationOrder(a.duration) - productDurationOrder(b.duration) || String(a.duration || '').localeCompare(String(b.duration || ''));
-    });
+    var items = groups[plat].slice().sort(compareProductPlans);
     var isOpen = expandedPlatforms[plat] !== false;
     var activeCount = items.filter(function(p) { return p.status === '啟用' }).length;
     html += '<div class="prod-group card">' +
