@@ -760,7 +760,9 @@ function renderProducts() {
   });
   var html = '';
   Object.keys(groups).sort().forEach(function(plat) {
-    var items = groups[plat].slice().sort(compareProductPlans);
+    var items = groups[plat].slice().sort(function(a,b) {
+      return Number(a.status !== '啟用') - Number(b.status !== '啟用') || compareProductPlans(a,b);
+    });
     var isOpen = expandedPlatforms[plat] !== false;
     var activeCount = items.filter(function(p) { return p.status === '啟用' }).length;
     html += '<div class="prod-group card">' +
