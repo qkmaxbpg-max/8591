@@ -259,7 +259,7 @@
   <div class="modal-head"><h3>新增商品與多個方案</h3><button class="close-btn" onclick="closeModal()">&times;</button></div>
   <div class="modal-body">
 <div class="form-group"><label for="pb_category">商品分類（所有方案共用）</label><div class="category-filter-controls"><select id="pb_category" data-category-select="assign"><option value="">未分類</option></select><button class="btn ghost" onclick="openCategoryManager()">＋ 新增／管理分類</button></div></div>
-<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pb_source"></select><div id="pb_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶</label><select id="pb_payAccount"></select><div id="pb_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pb_purchaseMode"></select><div id="pb_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
+<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pb_source"></select><div id="pb_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶（可留空）</label><select id="pb_payAccount"></select><div id="pb_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pb_purchaseMode"></select><div id="pb_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
     <div class="form-group"><label for="pb_platform">商品名稱</label><input id="pb_platform" list="platformList" placeholder="例如 YouTube Premium"></div>
     <div class="form-row"><div class="form-group"><label for="pb_info">共同提供資料</label><input id="pb_info" placeholder="例如電子信箱"></div><div class="form-group"><label for="pb_notes">共同備註</label><input id="pb_notes" placeholder="可在個別方案覆寫"></div></div>
     <p class="hint">每列是一個方案。期間可輸入天、週、月、年或自訂文字；自訂文字不自動計算訂單到期日。</p>
@@ -279,7 +279,7 @@
   </div>
   <div class="modal-body">
 <div class="form-group"><label for="pm_category">商品分類（所有方案共用）</label><div class="category-filter-controls"><select id="pm_category" data-category-select="assign"><option value="">未分類</option></select><button class="btn ghost" onclick="openCategoryManager()">＋ 新增／管理分類</button></div></div>
-<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pm_source"></select><div id="pm_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶</label><select id="pm_payAccount"></select><div id="pm_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pm_purchaseMode"></select><div id="pm_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
+<details class="procurement-defaults"><summary>採購預設（選填，可於採購時調整）</summary><div class="form-group"><label>預設貨源</label><select id="pm_source"></select><div id="pm_sourceDrop"></div></div><div class="form-group"><label>預設付款帳戶（可留空）</label><select id="pm_payAccount"></select><div id="pm_payAccountDrop"></div></div><div class="form-group"><label>採購模式</label><select id="pm_purchaseMode"></select><div id="pm_purchaseModeDrop"></div></div><p class="hint">只帶入預設，不自動製造採購或付款；歷史紀錄不跟著改。</p></details>
     <input id="pm_id" type="hidden">
     <div class="form-row">
       <div class="form-group"><label>平台/商品</label><input id="pm_platform" list="platformList" placeholder="YouTube Premium"><datalist id="platformList"></datalist></div>
@@ -527,7 +527,7 @@
 <script src="ad-periods.js?v=2170221b81fc"></script>
 <script src="seat-management.js?v=497a406f63dd"></script>
 <script src="product-categories.js?v=bedf23f18e48"></script>
-<script src="procurement.js?v=3a77441e0fb7"></script>
+<script src="procurement.js?v=4667a231b024"></script>
 <script src="finance-accounts.js?v=593e6accf9f3"></script>
 <script src="finance-ledger.js?v=98624134ae72"></script>
 <script src="finance-reports.js?v=397af1b177c4"></script>
@@ -547,7 +547,7 @@
 <script src="app.js?v=095c82ca4660"></script>
 <script src="quick-notes-db-ui.js?v=e2a35d536cf3"></script>
 <script src="phase1-integration.js?v=82f1f0cb59a4"></script>
-<script src="finance-persistence.js?v=571dcadfb932"></script>
+<script src="finance-persistence.js?v=ae426fea38af"></script>
 <script src="operations-persistence.js?v=897336dfe355"></script>
 </body>
 </html>

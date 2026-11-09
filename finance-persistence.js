@@ -28,9 +28,9 @@ function financeReverseChanges(current,changes){
  window.financeDefaultsPlan=function(prefix,items){
   if(!database||isDemo||scope!==identity()||writing)throw new Error('請等待財務資料載入完成');
   validatePurchaseDefaults(prefix);var supplier=$(prefix+'_source').value,account=$(prefix+'_payAccount').value,mode=$(prefix+'_purchaseMode').value;
-  if(supplier&&(!procurementState.suppliers.some(function(x){return x.id===supplier&&x.active;})||!procurementState.accounts.some(function(x){return x.id===account;})||!['individual','shared'].includes(mode)))throw new Error('採購預設的貨源或帳戶無效');
+  if(supplier&&(!procurementState.suppliers.some(function(x){return x.id===supplier&&x.active;})||(account&&!procurementState.accounts.some(function(x){return x.id===account;}))||!['individual','shared'].includes(mode)))throw new Error('採購預設的貨源或帳戶無效');
   var next=JSON.parse(JSON.stringify(procurementState)),sameBatch=prefix==='pb'&&productBatchEditing&&productBatchEditing.defaults===productBatchDefaultsSignature();
-  items.forEach(function(p){var existing=next.defaults.find(function(d){return d.product_id===String(p.id);});if(sameBatch&&products.some(function(x){return x.id===p.id;}))return;next.defaults=next.defaults.filter(function(d){return d.product_id!==String(p.id);});if(supplier)next.defaults.push({product_id:String(p.id),supplier_id:supplier,account_id:account,mode:mode});});
+  items.forEach(function(p){var existing=next.defaults.find(function(d){return d.product_id===String(p.id);});if(sameBatch&&products.some(function(x){return x.id===p.id;}))return;next.defaults=next.defaults.filter(function(d){return d.product_id!==String(p.id);});if(supplier)next.defaults.push({product_id:String(p.id),supplier_id:supplier,mode:mode,...(account?{account_id:account}:{})});});
   return JSON.stringify(next)===JSON.stringify(procurementState)?null:next;
  };
  window.financeSaveRevision=function(){return row?row.revision:0;};

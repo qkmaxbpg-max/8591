@@ -82,7 +82,7 @@ function openProcurement(orderId){
     procurementField('付款帳戶預設（只帶入，不代表已付款）','purchasePayAccount',procurementSelect('purchasePayAccount',procurementState.accounts,preset&&preset.account_id))+
     procurementField('商品／叫貨摘要','purchaseTitle','<input id="purchaseTitle" value="'+productAttr(order?[order.platform,order.version,order.duration].filter(Boolean).join(' · '):'')+'" placeholder="LINE 叫貨內容摘要">')+
     procurementField('採購金額合計（台幣）','purchaseAmount','<input id="purchaseAmount" type="number" min="0" step="0.01" value="'+(order?(order.unit_cost||0)*(order.qty||1):'')+'">')+
-    procurementField('付款狀態','purchasePaymentStatus',procurementSelect('purchasePaymentStatus',[{id:'paid',name:'已付款／已刷卡（全額）'},{id:'unpaid',name:'尚未付款'},{id:'advance',name:'預付款全額抵扣'}],'paid'))+
+    procurementField('付款狀態','purchasePaymentStatus',procurementSelect('purchasePaymentStatus',[{id:'paid',name:'已付款／已刷卡（全額）'},{id:'unpaid',name:'尚未付款'},{id:'advance',name:'預付款全額抵扣'}],preset&&preset.supplier_id&&!preset.account_id?'unpaid':'paid'))+
     procurementField('採購模式','purchaseMode',procurementSelect('purchaseMode',[{id:'individual',name:'一對一採購'},{id:'shared',name:'共用帳號月費'}],preset?preset.mode:'individual','onchange="toggleProcurementShared()"'))+
     '<div id="purchaseShared"><p class="hint">月費先登記一次，不重複加到每位客戶；座位成本分攤尚未啟用。</p>'+procurementField('對應共用帳號','purchaseServiceAccount',procurementSelect('purchaseServiceAccount',[{id:'',name:'請選共用帳號'}].concat(serviceAccounts.filter(function(a){return a.status==='啟用';}).map(function(a){return {id:String(a.id),name:a.platform+' · '+a.email};}))))+'<div class="form-row">'+procurementField('帳單服務起日','purchaseStart','<input id="purchaseStart" type="date">')+procurementField('帳單服務迄日','purchaseEnd','<input id="purchaseEnd" type="date">')+'</div></div>'+
     procurementField('LINE／叫貨備註（選填）','purchaseNote','<textarea id="purchaseNote" placeholder="例如訊息日期、叫貨內容；不需要貼帳密"></textarea>')+'<p class="hint">'+(order?'對應 '+esc(order.order_no)+'，成本帶自原訂單；不回寫訂單歷史成本。':'沒有對應客戶訂單的採購，也可直接登記。')+'</p>';
@@ -136,11 +136,11 @@ function syncPurchaseDefaults(prefix,product){
 function savePurchaseDefaults(prefix,items){
   var supplier=$(prefix+'_source').value,account=$(prefix+'_payAccount').value,mode=$(prefix+'_purchaseMode').value;
   if(!supplier&&!account&&!mode){var cleared=procurementCopy();items.forEach(function(p){cleared.defaults=cleared.defaults.filter(function(d){return d.product_id!==String(p.id);});});if(!isDemo)throw new Error('僅本機預覽');localStorage.setItem('preview-procurement-v1',JSON.stringify(cleared));procurementState=cleared;return;}
-  if(!supplier||!account||!mode)throw new Error('採購預設請完整選擇貨源、付款帳戶與採購模式，或全部留空');
-  var next=procurementCopy();items.forEach(function(product){next.defaults=next.defaults.filter(function(d){return d.product_id!==String(product.id);});next.defaults.push({product_id:String(product.id),supplier_id:supplier,account_id:account,mode:mode});});
+  validatePurchaseDefaults(prefix);
+  var next=procurementCopy();items.forEach(function(product){next.defaults=next.defaults.filter(function(d){return d.product_id!==String(product.id);});next.defaults.push({product_id:String(product.id),supplier_id:supplier,mode:mode,...(account?{account_id:account}:{})});});
   if(!isDemo)throw new Error('採購預設尚未開放正式寫入');localStorage.setItem('preview-procurement-v1',JSON.stringify(next));procurementState=next;
 }
-function validatePurchaseDefaults(prefix){var values=['_source','_payAccount','_purchaseMode'].map(function(field){return $(prefix+field).value;});if(values.some(Boolean)&&!values.every(Boolean))throw new Error('採購預設須完整選擇三個欄位，或全部留空');}
+function validatePurchaseDefaults(prefix){var values=['_source','_payAccount','_purchaseMode'].map(function(field){return $(prefix+field).value;});if(values.some(Boolean)&&(!values[0]||!values[2]))throw new Error('請選擇貨源及採購模式；付款帳戶可等付款時再選');}
 function openSupplierEditor(){
   if(procurementState.invalid)return toast('採購資料格式異常，請先排查','err');
   $('procurementModalTitle').textContent='新增貨源';$('procurementForm').innerHTML=procurementField('名稱','newSupplierName','<input id="newSupplierName" maxlength="80">')+procurementField('類型／備註','newSupplierKind','<input id="newSupplierKind" placeholder="例如串流、遊戲代儲、官方平台">')+'<p class="hint">所有商品與採購共用此貨源清單。此處不需輸入銀行帳號或密碼。</p>';
