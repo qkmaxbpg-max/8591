@@ -2,14 +2,15 @@
 function openProductDetail(id) {
   var product = products.find(function(p) { return String(p.id) === String(id); }); if (!product) return;
   function field(label, value) { return '<div><dt>' + esc(label) + '</dt><dd>' + esc(String(value == null || value === '' ? '—' : value)) + '</dd></div>'; }
-  var cost = Number(product.cost) || 0, price = Number(product.price) || 0, sp = Number(product.shopee_price) || 0;
+  var pending = isProductCostPending(product.cost), cost = Number(product.cost), price = Number(product.price) || 0, sp = Number(product.shopee_price) || 0;
   $('productDetailTitle').textContent = product.platform || '商品詳情';
-  $('productDetailBody').innerHTML = '<h4>方案內容</h4><dl class="order-detail-grid">' + field('方案', product.version || '標準方案') + field('期間',product.duration) + field('狀態',product.status) + field('成本／件','NT$' + fmtN(cost)) + '</dl><h4>各管道售價與試算</h4><dl class="order-detail-grid">' +
-    field('8591 售價','NT$' + fmtN(price)) + field('8591 試算利潤','NT$' + fmtN(price - cost - price * PLATFORM_FEE)) + field('8591 手續費率', (PLATFORM_FEE * 100) + '%') +
-    field('蝦皮售價',sp > 0 ? 'NT$' + fmtN(sp) : '未設定') + field('蝦皮試算利潤', sp > 0 ? 'NT$' + fmtN(sp - cost - sp * getShopFee()) : '未設定售價，不試算') + field('蝦皮手續費率',(getShopFee() * 100) + '%') + '</dl><p class="hint">依目前售價、成本與現行手續費試算，尚未計入出單人抽成、退款與其他費用。</p><h4>提供資料</h4><p class="order-detail-note">' + esc(product.required_info || '未設定') + '</p><h4>備註</h4><p class="order-detail-note">' + esc(product.notes || '無備註') + '</p>';
+  $('productDetailBody').innerHTML = '<h4>方案內容</h4><dl class="order-detail-grid">' + field('方案', product.version || '標準方案') + field('期間',product.duration) + field('狀態',product.status) + field('成本／件',pending ? '待補成本' : 'NT$' + fmtN(cost)) + '</dl><h4>各管道售價與試算</h4><dl class="order-detail-grid">' +
+    field('8591 售價','NT$' + fmtN(price)) + field('8591 試算利潤',pending ? '待補成本，不試算' : 'NT$' + fmtN(price - cost - price * PLATFORM_FEE)) + field('8591 手續費率', (PLATFORM_FEE * 100) + '%') +
+    field('蝦皮售價',sp > 0 ? 'NT$' + fmtN(sp) : '未設定') + field('蝦皮試算利潤', pending ? '待補成本，不試算' : sp > 0 ? 'NT$' + fmtN(sp - cost - sp * getShopFee()) : '未設定售價，不試算') + field('蝦皮手續費率',(getShopFee() * 100) + '%') + '</dl><p class="hint">依目前售價、成本與現行手續費試算，尚未計入出單人抽成、退款與其他費用。</p><h4>提供資料</h4><p class="order-detail-note">' + esc(product.required_info || '未設定') + '</p><h4>備註</h4><p class="order-detail-note">' + esc(product.notes || '無備註') + '</p>';
   $('productDetailActions').innerHTML = '<button class="btn ghost" onclick="closeModal()">關閉</button><button class="btn ghost" data-action="deleteProduct" data-id="' + productAttr(product.id) + '">刪除方案</button><button class="btn primary" data-action="editProduct" data-id="' + productAttr(product.id) + '">編輯方案</button>';
   closeModal(); openModal('productDetailModal');
 }
+function isProductCostPending(value) { return value == null || String(value).trim() === ''; }
 function productAttr(value) { return esc(String(value == null ? '' : value)).replace(/"/g, '&quot;'); }
 function parseProductDuration(value) {
   var text = String(value || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
@@ -67,7 +68,8 @@ function buildProductOptions(platform, entries, shared, existing) {
     if (!row.duration) throw new Error('第 ' + (index + 1) + ' 列請填寫期間，例如 7天、3個月或單次');
     ['cost', 'price', 'shopee_price'].forEach(function(field) {
       var raw = String(entry[field] == null ? '' : entry[field]).trim();
-      if (!raw && field !== 'shopee_price') throw new Error('第 ' + (index + 1) + ' 列請填寫成本與 8591 售價，免費請填 0');
+      if (!raw && field === 'price') throw new Error('第 ' + (index + 1) + ' 列請填寫 8591 售價');
+      if (!raw && field === 'cost') { row.cost = null; return; }
       var number = raw ? Number(raw) : 0;
       if (!Number.isFinite(number) || number < 0) throw new Error('第 ' + (index + 1) + ' 列的金額必須為零或正數');
       row[field] = number;
@@ -114,7 +116,7 @@ function addProductOption(duration) {
   var row = document.createElement('tr');
   row.innerHTML = '<td><input data-field="version" aria-label="方案名稱" placeholder="標準／家庭／個人"></td>' +
     '<td><input data-field="duration" aria-label="方案期間" list="productDurationChoices" placeholder="例如 7天／3個月"></td>' +
-    '<td><input data-field="cost" aria-label="方案成本" type="number" min="0" step="0.01" placeholder="0"></td>' +
+    '<td><input data-field="cost" aria-label="方案成本" type="number" min="0" step="0.01" placeholder="待補"></td>' +
     '<td><input data-field="price" aria-label="8591售價" type="number" min="0" step="0.01" placeholder="0"></td>' +
     '<td><input data-field="shopee_price" aria-label="蝦皮售價" type="number" min="0" step="0.01" placeholder="選填"></td>' +
     '<td><select data-field="status" aria-label="方案狀態"><option>啟用</option><option>停用</option></select></td>' +

@@ -23,7 +23,7 @@
 
   rows.forEach(function(p){if(!p.id)p.id=crypto.randomUUID();});
   var payload=catalogPayload(rows,category),stamp=scope,finance=window.financeDatabaseEnabled?financeDefaultsPlan(prefix,rows):null;
-  var clean=rows.map(function(p){var x={id:p.id};['platform','version','duration','cost','price','shopee_price','status','required_info','notes'].forEach(function(k){x[k]=p[k]==null?(k==='shopee_price'?0:''):p[k];});return x;});
+  var clean=rows.map(function(p){var x={id:p.id};['platform','version','duration','cost','price','shopee_price','status','required_info','notes'].forEach(function(k){x[k]=p[k]==null?(k==='cost'?null:k==='shopee_price'?0:''):p[k];});return x;});
   busy=true;
   try{var args={p_store:storeId||null,p_rows:clean,p_expected:expected.map(function(p){return {id:p.id,updated_at:p.updated_at||null};}),p_group:group||null,p_catalog:payload,p_revision:states.catalog?states.catalog.revision:0};if(window.financeDatabaseEnabled){args.p_finance=finance;args.p_finance_revision=financeSaveRevision();args.p_operation=crypto.randomUUID();}var result=ok(await sb.rpc(window.financeDatabaseEnabled?'mwj_save_products_finance':'mwj_save_products',args));if(result.finance)financeAcceptProductSave(result.finance);if(identity()!==stamp)throw new Error('資料已送出但店舖已切換，請重新載入確認');closeModal();loadAll();toast('商品與分類已整批儲存；歷史訂單不變','ok');}finally{busy=false;}
  }

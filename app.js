@@ -777,7 +777,7 @@ function renderProducts() {
       html += '<div class="table-scroll"><table class="prod-table"><colgroup><col style="width:22%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:14%"><col style="width:10%"><col style="width:16%"></colgroup><thead><tr><th>方案</th><th>期間</th><th class="text-right">成本</th><th class="text-right">8591售價</th><th class="text-right">蝦皮售價</th><th>狀態</th><th>操作</th></tr></thead><tbody>';
       items.forEach(function(p) {
         html += '<tr><td><strong>' + esc(p.version || '標準方案') + '</strong></td><td>' + esc(p.duration || '未設定') + '</td>' +
-          '<td class="text-right">' + fmtN(p.cost || 0) + '</td>' +
+          '<td class="text-right">' + (isProductCostPending(p.cost) ? '待補' : fmtN(p.cost)) + '</td>' +
           '<td class="text-right">' + fmtN(p.price || 0) + '</td>' +
           '<td class="text-right">' + (p.shopee_price > 0 ? fmtN(p.shopee_price) : '—') + '</td>' +
           '<td>' + (p.status === '啟用' ? '<span class="badge active">啟用</span>' : '<span class="badge inactive">停用</span>') + '</td>' +
@@ -810,7 +810,7 @@ function openProductModal(item) {
   $('pm_platform').value = item ? item.platform : '';
   $('pm_version').value = item ? item.version : '';
   $('pm_duration').value = item ? item.duration : '';
-  $('pm_cost').value = item ? item.cost : '';
+  $('pm_cost').value = item ? (item.cost ?? '') : '';
   $('pm_price').value = item ? item.price : '';
   $('pm_shopeePrice').value = item ? (item.shopee_price || '') : '';
   $('pm_status').value = item ? item.status : '啟用';
@@ -821,6 +821,7 @@ function openProductModal(item) {
   openModal('productModal');
 }
 function updateProdPreview() {
+  if (isProductCostPending($('pm_cost').value)) { $('prodPreview').textContent = '成本待補，暫不試算利潤。'; return; }
   var cost = Number($('pm_cost').value) || 0;
   var price = Number($('pm_price').value) || 0;
   var sp = Number($('pm_shopeePrice').value) || 0;
@@ -845,7 +846,7 @@ function saveProduct() {
     platform: $('pm_platform').value.trim(),
     version: $('pm_version').value.trim(),
     duration: $('pm_duration').value.trim(),
-    cost: Number($('pm_cost').value) || 0,
+    cost: isProductCostPending($('pm_cost').value) ? null : Number($('pm_cost').value),
     price: Number($('pm_price').value) || 0,
     shopee_price: Number($('pm_shopeePrice').value) || 0,
     fee_type: '百分比',
@@ -1210,7 +1211,7 @@ function onProductSelect() {
     var ch = $('om_channel').value;
     var usePrice = ((ch === '蝦皮' || ch === '個人') && p.shopee_price) ? p.shopee_price : p.price;
     $('om_unitPrice').value = usePrice;
-    $('om_unitCost').value = p.cost;
+    $('om_unitCost').value = p.cost ?? '';
     var base = dpGetVal('om_startDate') || dpGetVal('om_date') || today();
     if (!dpGetVal('om_startDate')) dpSetVal('om_startDate', base);
     setProductExpiry(base, p.duration || '');
@@ -1273,6 +1274,7 @@ function initSeatDrop(accountId) {
   });
 }
 function calcOrderPreview() {
+  if (isProductCostPending($('om_unitCost').value)) { $('orderPreview').textContent = '成本未填，暫不試算利潤。'; return; }
   var qty = Number($('om_qty').value) || 1;
   var price = Number($('om_unitPrice').value) || 0;
   var cost = Number($('om_unitCost').value) || 0;
@@ -1324,6 +1326,7 @@ function saveOrder() {
   var pid = temporary ? '' : $('om_product').value;
   var p = products.filter(function(x) { return String(x.id) === String(pid) })[0];
   if (!temporary && !pid) return toast('請先選擇商品及方案', 'err');
+  if (p && isProductCostPending(p.cost) && isProductCostPending($('om_unitCost').value)) return toast('此方案成本待補，請填本筆訂單成本後再儲存。', 'err');
   var agId = $('om_agent').value || null;
   var ag = agents.filter(function(x) { return String(x.id) === String(agId) })[0];
   var ch = $('om_channel').value;
@@ -1904,7 +1907,7 @@ function renewSeat(accountId, seatNum, oldOrderId) {
         var ch = $('om_channel').value;
         var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
         $('om_unitPrice').value = usePrice;
-        $('om_unitCost').value = prod.cost;
+        $('om_unitCost').value = prod.cost ?? '';
         setProductExpiry(expiryBase, prod.duration || '');
         calcOrderPreview();
       }
@@ -1961,7 +1964,7 @@ function renewOrder(oldOrderId) {
       var ch = $('om_channel').value;
       var usePrice = ((ch === '蝦皮' || ch === '個人') && prod.shopee_price) ? prod.shopee_price : prod.price;
       $('om_unitPrice').value = usePrice;
-      $('om_unitCost').value = prod.cost;
+      $('om_unitCost').value = prod.cost ?? '';
       setProductExpiry(expiryBase, prod.duration || '');
       var accts = serviceAccounts.filter(function(a) { return a.platform === prod.platform && a.status === '啟用' });
       if (accts.length > 0) {

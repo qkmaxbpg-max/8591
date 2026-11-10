@@ -127,7 +127,7 @@ function initOrderProductChoices(item) {
 }
 function initOrderPlanChoices(platform, selected, original) {
   var items = products.filter(function(p) { return p.platform === platform && (p.status === '啟用' || String(p.id) === selected); }).sort(compareProductPlans).map(function(p) {
-    return {value:String(p.id), label:[p.version || '標準方案',p.duration].filter(Boolean).join(' · '), tag:'NT$' + fmtN(p.price), sub:p.status === '啟用' ? '' : '歷史停用方案'};
+    return {value:String(p.id), label:[p.version || '標準方案',p.duration].filter(Boolean).join(' · '), tag:'NT$' + fmtN(p.price), sub:[p.status === '啟用' ? '' : '歷史停用方案',isProductCostPending(p.cost) ? '成本待補' : ''].filter(Boolean).join(' · ')};
   });
   if (selected && !items.some(function(p) {return p.value === selected;}) && original) items.push({value:selected,label:[original.version, original.duration].filter(Boolean).join(' · ') || '歷史方案',sub:'沿用原訂單紀錄'});
   cdropInit('om_productDrop',{items:items,value:selected,placeholder:platform ? '再選擇方案與期間' : '請先選商品',onSelect:function(value) {$('om_product').value=value; onProductSelect();}});
