@@ -39,7 +39,8 @@ function financeBuildReport(state,start,end){
   var originStart=start,financialStart=typeof financeStartDate==='function'?financeStartDate(state):'';
   if(financialStart&&end<financialStart)return {rows:[],warnings:['財務尚未起算：'+financialStart],revenue:0,cost:0,fee:0,expense:0,commission:0,compensation:0,net:0,cashIn:0,cashOut:0,refundPending:0,not_started:true};
   if(financialStart&&start<financialStart)start=financialStart;
-  var rows=[],warnings=[],eligible=orders.filter(function(o){return ['已完成','已退款'].includes(o.status);});
+  var excludePriorOrders=financialStart&&(state.settings||[]).some(function(setting){return setting.id==='accounting'&&setting.exclude_prior_orders===true;});
+  var rows=[],warnings=[],eligible=orders.filter(function(o){return ['已完成','已退款'].includes(o.status)&&(!excludePriorOrders||o.order_date>=financialStart);});
   if(start!==originStart)warnings.push('本報表從財務起算日 '+start+' 開始計算，舊訂單保留');
   function push(type,date,title,amount,extra){if(amount)rows.push(Object.assign({type:type,date:date,title:title,amount:amount},extra||{}));}
   var shared=state.purchases.filter(function(p){return p.mode==='shared'&&!p.opening;});
@@ -62,9 +63,10 @@ function financeBuildReport(state,start,end){
       push('commission',o.order_date,title+' 出單人抽成',Math.max(0,commission),{platform:o.platform,channel:o.channel||'8591',supplier:supplier});
     }
   });
-  state.purchases.filter(function(p){return !p.opening;}).forEach(function(p){
+  state.purchases.filter(function(p){return !p.opening&&(!excludePriorOrders||p.date>=financialStart);}).forEach(function(p){
     var order=orders.find(function(o){return String(o.id)===p.order_id;});
-    var cost=p.mode==='shared'?reportSpread(p.amount,p.service_start,p.service_end,start,end):order?financeOrderCost(state,p.amount,order,start,end):(ledgerInRange(p.date,start,end)?p.amount:0);
+    var spreadOrder=order&&(!excludePriorOrders||order.order_date>=financialStart);
+    var cost=p.mode==='shared'?reportSpread(p.amount,p.service_start,p.service_end,start,end):spreadOrder?financeOrderCost(state,p.amount,order,start,end):(ledgerInRange(p.date,start,end)?p.amount:0);
     if(cost===null){warnings.push('採購 '+p.title+' 期間不明，成本待確認');return;}
     var account=typeof serviceAccounts!=='undefined'&&serviceAccounts.find(function(a){return String(a.id)===String(p.service_account_id);});
     push('cost',p.date,p.title+(p.mode==='shared'?'（共用帳號整體成本，含空置）':''),cost,{supplier:p.supplier_name,platform:order?order.platform:account?account.platform:'未對應商品',channel:order?order.channel||'8591':''});
