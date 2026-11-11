@@ -12,10 +12,10 @@
   if(isDemo)return localOrder(obj,id);if(orderBusy)return;
   var stamp=scope(),button=document.querySelector('#orderModal .modal-foot .btn.primary');
   try{orderBusy=true;if(button)button.disabled=true;var original=id?orders.find(function(o){return o.id===id;}):null;if(id&&!original)throw new Error('找不到原訂單');
-   obj=Object.assign({},obj,{user_id:userId});if(!id){obj.renewal_parent_id=previewRenewalParent||null;obj.purchase_kind=previewRenewalParent?'renewal':'first';var text=JSON.stringify(obj);if(!pendingOrder||pendingOrder.text!==text)pendingOrder={text:text,id:crypto.randomUUID()};obj.id=pendingOrder.id;}
+   obj=Object.assign({},obj,{user_id:userId});if(!id){obj.renewal_parent_id=previewRenewalParent||null;obj.purchase_kind=previewRenewalParent?'renewal':'first';var text=JSON.stringify(obj,function(key,value){return key==='order_no'?undefined:value;});if(!pendingOrder||pendingOrder.text!==text)pendingOrder={text:text,id:crypto.randomUUID()};obj.id=pendingOrder.id;}
    var request=id?queryScope(sb.from('orders').update(obj)).eq('id',id):sb.from('orders').insert(obj);if(id)request=original.updated_at?request.eq('updated_at',original.updated_at):request.is('updated_at',null);
    var result=await request.select('id').maybeSingle();
-   if(!id&&result.error&&result.error.code==='23505'){var existing=await queryScope(sb.from('orders').select('*')).eq('id',obj.id).maybeSingle();if(!existing.error&&existing.data&&Object.keys(obj).every(function(k){return existing.data[k]===obj[k];}))result={data:{id:obj.id},error:null};}
+   if(!id&&result.error&&result.error.code==='23505'){var existing=await queryScope(sb.from('orders').select('*')).eq('id',obj.id).maybeSingle();if(!existing.error&&existing.data&&Object.keys(obj).every(function(k){return k==='order_no'?/^MWJ-\d+$/.test(existing.data[k]):existing.data[k]===obj[k];}))result={data:{id:obj.id},error:null};}
    if(result.error||!result.data)throw new Error('訂單未確認儲存成功；可能已被修改、重複續約或座位衝突。請重新讀取確認');
    if(scope()!==stamp)throw new Error('已送出，但店舖已切換，請重新讀取確認');pendingOrder=null;previewRenewalParent='';closeModal();loadAll();toast('訂單與續約關聯已儲存','ok');
   }catch(e){toast(e.message,'err');}finally{orderBusy=false;if(button)button.disabled=false;}
