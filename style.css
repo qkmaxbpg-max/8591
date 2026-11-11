@@ -133,6 +133,17 @@ select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .top-right{display:flex;align-items:center;gap:8px}
 .user-label{font-size:.8rem;color:var(--fg2)}
 
+@media(max-width:700px){
+  #topBar{flex-direction:column;align-items:stretch;gap:4px}
+  #topBar .top-left{min-width:0;gap:6px}
+  #appLogoWrap{display:flex;flex:none;order:1}
+  #appTitle{order:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #workspaceLabel{order:3;flex:none;white-space:nowrap;margin-left:2px;padding:3px 7px;border-radius:12px;background:var(--bg3);font-size:.72rem}
+  #storeSwitcher{order:4;flex:0 1 auto;min-width:0;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+  #topBar .top-right{gap:4px}
+  #topBar .top-right .btn{margin-right:auto;white-space:nowrap}
+}
+
 /* Tab Bar */
 #tabBar{display:flex;gap:2px;padding:0 16px;background:var(--bg1);border-bottom:1px solid var(--bg3);overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tab{padding:10px 16px;border:none;background:none;color:var(--fg2);font-size:.9rem;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:var(--transition);white-space:nowrap}
