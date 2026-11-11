@@ -37,7 +37,6 @@ function financeReverseChanges(current,changes){
  window.financeAcceptProductSave=function(result){if(result){row={revision:result.revision,payload:result.payload};procurementState=result.payload;}};
 
  window.financeDatabaseLoad=async function(){var stamp=identity(),result=await scoped(sb.from('mwj_finance_state').select('*')).maybeSingle();if(result.error)throw new Error('財務資料讀取失敗，未改用本機舊資料');if(stamp!==identity())return;row=result.data;scope=stamp;pending=null;var data=row?row.payload:empty();procurementValidateState(data);procurementState=data;};
- if(database){var load=phase1Load;phase1Load=async function(){await load();await financeDatabaseLoad();};}
  window.financeDatabaseCommit=function(next,reason,reverses){
   if(!financeStartDate(next)&&['purchases','payments','cashEntries','transfers','platformMonths','supplierCredits'].some(function(k){return (next[k]||[]).length;}))return Promise.reject(new Error('請先到財務設定選擇起算日'));
   if(writing)return Promise.reject(new Error('財務正在儲存，請勿重複送出'));

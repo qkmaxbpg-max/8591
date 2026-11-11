@@ -217,7 +217,8 @@ async function loadAll() {
       readAllBusinessRows('orders','order_date',false,true),
       readAllBusinessRows('ad_spends','ad_date',false,true),
       readAllBusinessRows('service_accounts','created_at',true,true),
-      readAllBusinessRows('ad_configs','created_at',false,true)
+      readAllBusinessRows('ad_configs','created_at',false,true),
+      window.financeDatabaseEnabled ? financeDatabaseLoad() : null
     ]);
     if(loadScope!==String(userId)+'/'+String(storeId||''))return;
     products=res[0];agents=res[1];customers=res[2];orders=res[3];ads=res[4];serviceAccounts=res[5];adConfigs=res[6];
@@ -228,10 +229,16 @@ async function loadAll() {
 }
 
 function renderAll() {
-  renderProcurement();
   syncCategorySelectors();
   var sh = $('stickyHeader');
   if (sh) document.documentElement.style.setProperty('--sticky-top', sh.offsetHeight + 'px');
+  if (!isDemo && window.phase1DatabaseEnabled) {
+    var active = document.querySelector('.tab-content.active');
+    renderBusinessTab(active ? active.id.slice(4) : 'dashboard');
+    checkExpiryNotifications();
+    return;
+  }
+  renderProcurement();
   renderDashboard();
   renderProducts();
   renderOrders();
@@ -240,6 +247,17 @@ function renderAll() {
   renderAds();
   renderSubscriptions();
   checkExpiryNotifications();
+}
+
+function renderBusinessTab(name) {
+  var renders = {
+    dashboard:renderDashboard, orders:renderOrders, products:renderProducts, agents:renderAgents,
+    customers:renderCustomers, ads:renderAds, subs:renderSubscriptions,
+    financeOverview:renderFinanceReports, financeAccounts:renderFinanceAccounts,
+    procurement:renderProcurement, suppliers:renderProcurement, cashLedger:renderFinanceLedger,
+    platformMonths:renderFinanceLedger, afterSales:renderFinanceLedger
+  };
+  if (Object.hasOwn(renders,name)) renders[name]();
 }
 
 /* ──── Tab switching ──── */
@@ -251,6 +269,7 @@ function switchTab(name) {
     tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === (financeParent[name] || name));
   for (var i = 0; i < contents.length; i++)
     contents[i].classList.toggle('active', contents[i].id === 'tab-' + name);
+  if (!isDemo && window.phase1DatabaseEnabled && $('app').dataset.loading !== 'true') renderBusinessTab(name);
 }
 
 /* ──── Modal ──── */
