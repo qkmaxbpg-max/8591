@@ -87,7 +87,7 @@ function financeBuildReport(state,start,end){
   var revenue=sum('income'),cost=sum('cost'),fee=sum('fee'),expense=sum('expense'),commission=sum('commission'),compensation=sum('compensation');
   var cashIn=0,cashOut=0;
   state.payments.filter(function(p){return ledgerInRange(p.date,start,end)&&state.accounts.some(function(a){return a.id===p.account_id&&a.kind==='bank';});}).forEach(function(p){cashOut+=p.amount;});
-  ledgerRows(state,'cashEntries').filter(function(e){return ledgerInRange(e.date,start,end)&&state.accounts.some(function(a){return a.id===e.account_id&&a.kind==='bank';});}).forEach(function(e){if(['receipt','compensation','capital_in'].includes(e.kind))cashIn+=e.amount;else cashOut+=e.amount;});
+  ledgerRows(state,'cashEntries').filter(function(e){return e.balance_adjustment!==true&&ledgerInRange(e.date,start,end)&&state.accounts.some(function(a){return a.id===e.account_id&&a.kind==='bank';});}).forEach(function(e){if(['receipt','compensation','capital_in'].includes(e.kind))cashIn+=e.amount;else cashOut+=e.amount;});
   ledgerRows(state,'transfers').filter(function(t){return t.kind==='card_repayment'&&ledgerInRange(t.date,start,end);}).forEach(function(t){cashOut+=t.amount;});
   return {rows:rows,warnings:Array.from(new Set(warnings)),revenue:revenue,cost:cost,fee:fee,expense:expense,commission:commission,compensation:compensation,net:revenue-cost-fee-expense-commission+compensation,cashIn:cashIn,cashOut:cashOut,refundPending:refundCases.filter(function(c){return !c.paid_at;}).reduce(function(s,c){return s+c.amount;},0)};
 }
