@@ -84,6 +84,18 @@ function openLedgerEntry(kind){
   var draft=procurementId();
   ledgerOpen('新增收支｜只登記實際發生款項',ledgerSelectField('用途','ledgerKind',[{id:'receipt',name:'客戶實際收款（非平台撥款）'},{id:'expense',name:'營業費用（非商品成本）'},{id:'capital_in',name:'業主投入（不是收入）'},{id:'capital_out',name:'業主提領（不是費用）'}],kind||'expense')+procurementField('日期','ledgerDate','<input id="ledgerDate" type="date" value="'+today()+'">')+ledgerSelectField('帳戶','ledgerAccount',procurementState.accounts)+procurementField('台幣金額','ledgerAmount','<input id="ledgerAmount" type="number" min="0.01" step="0.01">')+procurementField('用途／費用類別','ledgerNote','<input id="ledgerNote" placeholder="例如廣告實際付款、系統月費、業主投入">')+'<p class="hint">採購成本請用採購帳本；平台撥款用平台月結，不要再當客戶收款。廣告頁按日費用是估算，此處登記實付費用，不會再疊加廣告估算。</p>',['ledgerKind','ledgerAccount'],function(next){ledgerEntry(next,{id:draft,kind:$('ledgerKind').value,date:$('ledgerDate').value,account_id:$('ledgerAccount').value,amount:ledgerMoney($('ledgerAmount').value),note:$('ledgerNote').value.trim()});});
 }
+function openBankBalanceAdjustment(){
+  var draft=procurementId();
+  var banks=procurementState.accounts.filter(function(account){return account.kind==='bank'&&account.opening_date;});
+  var fields=ledgerSelectField('銀行帳戶','adjustmentAccount',banks)+
+    procurementField('調整日期','adjustmentDate','<input id="adjustmentDate" type="date" value="'+today()+'">')+
+    procurementField('差額（增加填正數，減少填負數）','adjustmentAmount','<input id="adjustmentAmount" type="number" step="0.01" placeholder="例如 -250">')+
+    procurementField('調整原因','adjustmentReason','<input id="adjustmentReason" placeholder="例如月底核對代儲資金">');
+  ledgerOpen('銀行餘額調整',fields,['adjustmentAccount'],function(next){
+    var raw=$('adjustmentAmount').value.trim();
+    ledgerEntry(next,{id:draft,kind:raw.startsWith('-')?'capital_out':'capital_in',date:$('adjustmentDate').value,account_id:$('adjustmentAccount').value,amount:ledgerMoney(raw.replace(/^[-+]/,'')),note:$('adjustmentReason').value.trim(),balance_adjustment:true});
+  });
+}
 function openPlatformMonth(){
   var draft=procurementId(),month=today().slice(0,7);
   var fields=ledgerSelectField('平台','platformName',[{id:'8591',name:'8591（手動提領）'},{id:'蝦皮',name:'蝦皮（自動撥款）'}],'8591','onchange="prefillPlatformMonth()"')+procurementField('月份','platformMonth','<input id="platformMonth" type="month" value="'+month+'" onchange="prefillPlatformMonth()">');
@@ -115,7 +127,7 @@ function openSupplierOpening(supplier){
 function renderFinanceLedger(){
   if(!$('ledgerEntries')||procurementState.invalid)return;var state=procurementState;
   var names={receipt:'收款',expense:'營業費用',refund:'客戶退款',compensation:'供應商補償',capital_in:'業主投入',capital_out:'業主提領'};
-  $('ledgerEntries').innerHTML='<div class="table-scroll"><table><thead><tr><th>日期</th><th>用途</th><th>帳戶</th><th>摘要</th><th class="text-right">金額</th></tr></thead><tbody>'+ledgerRows(state,'cashEntries').slice().reverse().map(function(e){return '<tr><td>'+esc(e.date)+'</td><td>'+esc(names[e.kind]||e.kind)+'</td><td>'+esc((state.accounts.find(function(a){return a.id===e.account_id;})||{}).name)+'</td><td>'+esc(e.note)+'</td><td class="text-right">'+fmtN(e.amount/100)+'</td></tr>';}).join('')+'</tbody></table></div>';
+  $('ledgerEntries').innerHTML='<div class="toolbar"><button type="button" class="btn ghost" onclick="openBankBalanceAdjustment()">銀行餘額調整</button></div><div class="table-scroll"><table><thead><tr><th>日期</th><th>用途</th><th>帳戶</th><th>摘要</th><th class="text-right">金額</th></tr></thead><tbody>'+ledgerRows(state,'cashEntries').slice().reverse().map(function(e){var adjustment=e.balance_adjustment===true;return '<tr><td>'+esc(e.date)+'</td><td>'+esc(adjustment?'餘額調整':names[e.kind]||e.kind)+'</td><td>'+esc((state.accounts.find(function(a){return a.id===e.account_id;})||{}).name)+'</td><td>'+esc(e.note)+'</td><td class="text-right">'+(adjustment?(e.kind==='capital_out'?'−':'+'):'')+fmtN(e.amount/100)+'</td></tr>';}).join('')+'</tbody></table></div>';
   $('platformMonthsList').innerHTML='<div class="table-scroll"><table><thead><tr><th>月份／平台</th><th class="text-right">成交</th><th class="text-right">實際手續費</th><th class="text-right">銀行實收</th><th class="text-right">期末平台餘額</th><th>差異</th></tr></thead><tbody>'+ledgerRows(state,'platformMonths').slice().reverse().map(function(m){return '<tr><td>'+esc(m.month)+' · '+esc(m.platform)+'</td><td class="text-right">'+fmtN(m.sales/100)+'</td><td class="text-right">'+fmtN(m.fees/100)+'</td><td class="text-right">'+fmtN(m.payout/100)+'</td><td class="text-right">'+fmtN(m.closing/100)+'</td><td class="'+(m.difference?'text-yellow':'text-green')+'">'+(m.difference?'待查 NT$'+fmtN(m.difference/100)+' · '+esc(m.difference_note):'已平衡')+'</td></tr>';}).join('')+'</tbody></table></div>';
   $('afterSalesList').innerHTML='<div class="table-scroll"><table><thead><tr><th>日期／訂單</th><th>處理</th><th>說明</th><th>進度</th><th>操作</th></tr></thead><tbody>'+ledgerRows(state,'afterSales').slice().reverse().map(function(c){return '<tr><td>'+esc(c.date)+'<div class="order-sub">'+esc(c.order_no)+'</div></td><td>'+esc(c.action==='refund'?'退款 NT$'+fmtN(c.amount/100):c.action==='replace'?'換帳號':'補 '+c.days+' 天')+'</td><td>'+esc(c.reason)+'</td><td>'+esc(c.action==='refund'?(c.paid_at?'已實退 '+c.paid_at:'待退付'):'已登記處理')+'</td><td>'+(c.action==='refund'&&!c.paid_at?'<button class="btn sm ghost" data-action="refundPaid" data-id="'+productAttr(c.id)+'">登記已退付</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
 }
