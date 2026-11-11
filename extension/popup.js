@@ -63,11 +63,11 @@ function showResults() {
     listHtml += '<div class="order-item">' +
       '<div class="order-head">' +
         '<span class="name">' + esc(o.platform) + '</span>' +
-        '<span class="price">$' + fmtN(o.unit_price) + (o.qty > 1 ? ' x' + o.qty : '') + '</span>' +
+        '<span class="price">$' + fmtN(o.unit_price) + (Number(o.qty) > 1 ? ' x' + fmtN(o.qty) : '') + '</span>' +
       '</div>' +
       (o.version ? '<div class="detail">品項：' + esc(o.version) + '</div>' : '') +
       '<div class="meta">' +
-        '<span>' + (o.order_date || '無日期') + '</span>' +
+        '<span>' + esc(o.order_date || '無日期') + '</span>' +
         '<span>買家 ' + esc(o.buyer) + '</span>' +
         '<span class="badge ' + (o.status === '已完成' ? 'ok' : 'pending') + '">' + esc(o.status) + '</span>' +
       '</div>' +
