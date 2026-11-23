@@ -23,7 +23,7 @@ function procurementDue(state,purchase){if(purchase.opening&&purchase.date>today
 function procurementPaymentLabel(state,purchase){
   var due=procurementDue(state,purchase);
   if(due===purchase.amount&&due>0)return '尚未付款';
-  if(due>0)return '舊版部分付款 · 待結清 NT$'+fmtN(due/100);
+  if(due>0)return '已部分付款 · 待結清 NT$'+fmtN(due/100);
   if(!purchase.amount)return '零元採購';
   var linked=state.allocations.filter(function(a){return a.purchase_id===purchase.id;}).map(function(a){return state.payments.find(function(p){return p.id===a.payment_id;});});
   if(linked.every(function(p){return p&&p.kind==='advance';}))return '預付款已全額抵扣';
